@@ -1,0 +1,30 @@
+{
+  "version": "0.2.1",
+    "tasks":
+    [
+        {
+            "taskName": "task-build-library",
+            "taskLabel": "task-build-library",
+            "appliesTo": "build_library.bat",
+            "type": "launch",
+            "contextType": "build",
+            "command": "build_library.bat"
+        },
+        {
+            "taskName": "task-build-tests",
+            "taskLabel": "task-build-tests",
+            "appliesTo": "build_tests.bat",
+            "type": "launch",
+            "contextType": "build",
+            "command": "build_tests.bat"
+        },
+        {
+            "taskName": "task-build-demo",
+            "taskLabel": "task-build-demo",
+            "appliesTo": "build_demo.bat",
+            "type": "launch",
+            "contextType": "build",
+            "command": "build_demo.bat"
+        }
+    ]
+}
