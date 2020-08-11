@@ -12,8 +12,19 @@
 #include "Graphics/OpenGL/GraphicsDevice.h"
 #include "Graphics/OpenGL/OpenGL.h"
 #include "Graphics/OpenGL/OpenGLRenderer.h"
+#include "Graphics/RayTracing/RayTracingAlgorithm.h"
+#include "Graphics/Renderer.h"
 #include "Graphics/Triangle.h"
 #include "Windowing/Win32Window.h"
+
+// ENUMS.
+enum class RendererType
+{
+    SOFTWARE_RASTERIZER = 0,
+    SOFTWARE_RAY_TRACER,
+    OPEN_GL,
+    DIRECT_X
+};
 
 // GLOBALS.
 // Global to provide access to them within the window procedure.
@@ -21,6 +32,17 @@
 static std::unique_ptr<WINDOWING::Win32Window> g_window = nullptr;
 /// The objects currently being rendered.
 static std::vector<GRAPHICS::Object3D> g_objects;
+/// The type of renderer currently being used.
+static RendererType g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
+/// The software rasterizer.
+static std::unique_ptr<GRAPHICS::Renderer> g_software_rasterizer = nullptr;
+static std::unique_ptr<GRAPHICS::RenderTarget> g_software_render_target = nullptr;
+/// The ray tracer.
+static std::unique_ptr<GRAPHICS::RAY_TRACING::RayTracingAlgorithm> g_ray_tracer = nullptr;
+/// The OpenGL renderer.
+static std::unique_ptr<GRAPHICS::OPEN_GL::OpenGLRenderer> g_open_gl_renderer = nullptr;
+std::shared_ptr<GRAPHICS::OPEN_GL::GraphicsDevice> g_open_gl_graphics_device = nullptr;
+
 
 /// The main window callback procedure for processing messages sent to the main application window.
 /// @param[in]  window - Handle to the window.
@@ -59,15 +81,105 @@ LRESULT CALLBACK MainWindowCallback(
             break;
         case WM_KEYDOWN:
         {
-#if 0
+#if 1
             int virtual_key_code = static_cast<int>(w_param);
             // https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
             switch (virtual_key_code)
             {
                 /// @todo
-            default:
-                virtual_key_code;
-                break;
+                case 0x31: // 1
+                {
+                    bool software_rasterizer_already_being_used = (RendererType::SOFTWARE_RASTERIZER == g_current_renderer_type);
+                    if (!software_rasterizer_already_being_used)
+                    {
+                        if (!g_software_rasterizer)
+                        {
+                            g_software_rasterizer = std::make_unique<GRAPHICS::Renderer>();
+                        }
+
+                        if (!g_software_render_target)
+                        {
+                            /// @todo   Centralize screen dimensions.
+                            g_software_render_target = std::make_unique<GRAPHICS::RenderTarget>(400, 400, GRAPHICS::ColorFormat::ARGB);
+                        }
+
+                        /// @todo   Global camera?
+                        g_software_rasterizer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 100.0f));
+
+                        g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
+                    }
+                    break;
+                }
+                case 0x32: // 2
+                {
+                    bool ray_tracer_already_being_used = (RendererType::SOFTWARE_RAY_TRACER == g_current_renderer_type);
+                    if (!ray_tracer_already_being_used)
+                    {
+                        if (!g_ray_tracer)
+                        {
+                            g_ray_tracer = std::make_unique<GRAPHICS::RAY_TRACING::RayTracingAlgorithm>();
+                        }
+
+                        /// @todo   Global camera?
+                        g_ray_tracer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 1.0f));
+
+                        g_current_renderer_type = RendererType::SOFTWARE_RAY_TRACER;
+                    }
+                    break;
+                }
+                case 0x33: // 3
+                {
+                    bool open_gl_already_being_used = (RendererType::OPEN_GL == g_current_renderer_type);
+                    if (!open_gl_already_being_used)
+                    {
+                        if (!g_open_gl_renderer)
+                        {
+                            g_open_gl_renderer = std::make_unique<GRAPHICS::OPEN_GL::OpenGLRenderer>();
+
+                            // GET THE DEVICE CONTEXT OF THE WINDOW.
+                            HDC device_context = GetDC(g_window->WindowHandle);
+                            bool device_context_retrieved = (NULL != device_context);
+                            if (!device_context_retrieved)
+                            {
+                                OutputDebugString("Failed to get window device context.");
+                                break;
+                            }
+
+                            // INITIALIZE OPEN GL.
+                            bool open_gl_initialized = GRAPHICS::OPEN_GL::Initialize(device_context);
+                            if (!open_gl_initialized)
+                            {
+                                OutputDebugString("Failed to initialize OpenGL.");
+                                break;
+                            }
+
+                            // CREATE THE GRAPHICS DEVICE.
+                            g_open_gl_graphics_device = GRAPHICS::OPEN_GL::GraphicsDevice::Create(device_context);
+                            bool graphics_device_created = (nullptr != g_open_gl_graphics_device);
+                            if (!graphics_device_created)
+                            {
+                                OutputDebugString("Failed to create the graphics device.");
+                                break;
+                            }
+                        }
+
+                        /// @todo   Where to put these?
+                        /// @todo   Centralize screen dimensions!
+                        glViewport(0, 0, 400, 400);
+
+                        glMatrixMode(GL_PROJECTION);
+                        glLoadIdentity();
+                        glOrtho(-200.0f, 200.0f, -200.0f, 200.0f, -1.0f, 1.0f);
+                        glMatrixMode(GL_MODELVIEW);
+                        glLoadIdentity();
+
+                        g_current_renderer_type = RendererType::OPEN_GL;
+                    }
+                    break;
+                }
+                default:
+                    virtual_key_code;
+                    break;
             }
 #endif
 
@@ -142,43 +254,19 @@ int CALLBACK WinMain(
         return EXIT_FAILURE;
     }
 
-    // GET THE DEVICE CONTEXT OF THE WINDOW.
-    HDC device_context = GetDC(g_window->WindowHandle);
-    bool device_context_retrieved = (NULL != device_context);
-    if (!device_context_retrieved)
+    // INITIALIZE THE DEFAULT RENDERER.
+    if (!g_software_rasterizer)
     {
-        OutputDebugString("Failed to get window device context.");
-        return EXIT_FAILURE;
+        g_software_rasterizer = std::make_unique<GRAPHICS::Renderer>();
     }
-
-    // INITIALIZE OPEN GL.
-    bool open_gl_initialized = GRAPHICS::OPEN_GL::Initialize(device_context);
-    if (!open_gl_initialized)
+    if (!g_software_render_target)
     {
-        OutputDebugString("Failed to initialize OpenGL.");
-        return EXIT_FAILURE;
+        /// @todo   Centralize screen dimensions.
+        g_software_render_target = std::make_unique<GRAPHICS::RenderTarget>(400, 400, GRAPHICS::ColorFormat::ARGB);
     }
-
-    // CREATE THE GRAPHICS DEVICE.
-    std::shared_ptr<GRAPHICS::OPEN_GL::GraphicsDevice> graphics_device = GRAPHICS::OPEN_GL::GraphicsDevice::Create(device_context);
-    bool graphics_device_created = (nullptr != graphics_device);
-    if (!graphics_device_created)
-    {
-        OutputDebugString("Failed to create the graphics device.");
-        return EXIT_FAILURE;
-    }
-
-    // INITIALIZE THE RENDERER.
-    GRAPHICS::OPEN_GL::OpenGLRenderer open_gl_renderer;
-
-    /// @todo   Where to put these?
-    glViewport(0, 0, SCREEN_WIDTH_IN_PIXELS, SCREEN_HEIGHT_IN_PIXELS);
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(-200.0f, 200.0f, -200.0f, 200.0f, -1.0f, 1.0f);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+    /// @todo   Global camera?
+    g_software_rasterizer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 100.0f));
+    g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
 
     // CREATE EXAMPLE OBJECTS.
     std::vector<GRAPHICS::Object3D> objects;
@@ -239,35 +327,47 @@ int CALLBACK WinMain(
             DispatchMessage(&message);
         }
 
-        // CLEAR THE SCREEN FROM THE PREVIOUS FRAME.
-#if 0
-        render_target.FillPixels(GRAPHICS::Color::BLACK);
-
-        // RENDER ALL OBJECTS.
-        for (auto object_3D : g_objects)
+        // RENDER THE SCENE BASED ON THE CURRENT RENDERER.
+        switch (g_current_renderer_type)
         {
-            g_renderer->Render(object_3D, *g_lights, render_target);
+            case RendererType::SOFTWARE_RASTERIZER:
+            {
+                // CLEAR THE SCREEN FROM THE PREVIOUS FRAME.
+                g_software_render_target->FillPixels(GRAPHICS::Color::BLACK);
+
+                // RENDER ALL OBJECTS.
+                for (auto object_3D : g_objects)
+                {
+                    const std::vector<GRAPHICS::Light> NO_LIGHTS_YET;
+                    g_software_rasterizer->Render(object_3D, NO_LIGHTS_YET, *g_software_render_target);
+                }
+
+                // DISPLAY THE RENDERED OBJECTS IN THE WINDOW.
+                g_window->Display(*g_software_render_target);
+
+                break;
+            }
+            case RendererType::OPEN_GL:
+            {
+                g_open_gl_renderer->ClearScreen(GRAPHICS::Color::BLACK);
+                for (const auto& object_3D : objects)
+                {
+                    g_open_gl_renderer->Render(object_3D);
+                }
+
+                glFlush();
+
+                GLenum error = glGetError();
+                if (error != GL_NO_ERROR)
+                {
+                    error = error;
+                }
+
+                SwapBuffers(g_open_gl_graphics_device->DeviceContext);
+
+                break;
+            }
         }
-
-        // DISPLAY THE RENDERED OBJECTS IN THE WINDOW.
-        g_window->Display(render_target);
-#endif
-
-        open_gl_renderer.ClearScreen(GRAPHICS::Color::BLACK);
-        for (const auto& object_3D : objects)
-        {
-            open_gl_renderer.Render(object_3D);
-        }
-
-        glFlush();
-
-        GLenum error = glGetError();
-        if (error != GL_NO_ERROR)
-        {
-            error = error;
-        }
-
-        SwapBuffers(graphics_device->DeviceContext);
 
 #define DISPLAY_FRAME_TIMES 1
 #if DISPLAY_FRAME_TIMES
