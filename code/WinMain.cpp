@@ -104,7 +104,7 @@ LRESULT CALLBACK MainWindowCallback(
                         }
 
                         /// @todo   Global camera?
-                        g_software_rasterizer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 100.0f));
+                        g_software_rasterizer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
 
                         g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
                     }
@@ -265,23 +265,25 @@ int CALLBACK WinMain(
         g_software_render_target = std::make_unique<GRAPHICS::RenderTarget>(400, 400, GRAPHICS::ColorFormat::ARGB);
     }
     /// @todo   Global camera?
-    g_software_rasterizer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 100.0f));
+    g_software_rasterizer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
     g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
 
     // CREATE EXAMPLE OBJECTS.
-    std::vector<GRAPHICS::Object3D> objects;
+    std::shared_ptr<GRAPHICS::Material> material = std::make_shared<GRAPHICS::Material>();
+    material->Shading = GRAPHICS::ShadingType::FLAT;
+    material->FaceColor = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f);
     GRAPHICS::Object3D triangle_object;
     triangle_object.Triangles =
     {
         GRAPHICS::Triangle(
-            nullptr,
+            material,
             {
                 MATH::Vector3f(0.0f, 200.0f, 0.0f),
                 MATH::Vector3f(-200.0f, -200.0f, 0.0f),
                 MATH::Vector3f(200.0f, -200.0f, 0.0f)
             })
     };
-    objects.push_back(triangle_object);
+    g_objects.push_back(triangle_object);
 
     // RUN A MESSAGE LOOP.
     constexpr float TARGET_FRAMES_PER_SECOND = 60.0f;
@@ -350,7 +352,7 @@ int CALLBACK WinMain(
             case RendererType::OPEN_GL:
             {
                 g_open_gl_renderer->ClearScreen(GRAPHICS::Color::BLACK);
-                for (const auto& object_3D : objects)
+                for (const auto& object_3D : g_objects)
                 {
                     g_open_gl_renderer->Render(object_3D);
                 }

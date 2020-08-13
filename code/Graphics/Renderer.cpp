@@ -55,7 +55,7 @@ namespace GRAPHICS
         MATH::Matrix4x4f camera_view_transform = Camera.ViewTransform();
 
         /// @todo   Figure out how we want to put projections into camera class.
-        constexpr float WORLD_HALF_SIZE = 100.0f;
+        constexpr float WORLD_HALF_SIZE = 200.0f;
         const float LEFT_X_WORLD_BOUNDARY = Camera.WorldPosition.X - WORLD_HALF_SIZE;
         const float RIGHT_X_WORLD_BOUNDARY = Camera.WorldPosition.X + WORLD_HALF_SIZE;
         const float BOTTOM_Y_WORLD_BOUNDARY = Camera.WorldPosition.Y - WORLD_HALF_SIZE;
@@ -63,7 +63,7 @@ namespace GRAPHICS
         //const float NEAR_Z_WORLD_BOUNDARY = Camera.WorldPosition.Z - 0.5f;
         //const float FAR_Z_WORLD_BOUNDARY = Camera.WorldPosition.Z - 2.5f;
         const float NEAR_Z_WORLD_BOUNDARY = Camera.WorldPosition.Z - 1.0f;
-        const float FAR_Z_WORLD_BOUNDARY = Camera.WorldPosition.Z - 500.0f;
+        const float FAR_Z_WORLD_BOUNDARY = Camera.WorldPosition.Z - 3.0f; //- 500.0f;
         MATH::Matrix4x4f orthographic_projection_transform = Camera::OrthographicProjection(
             LEFT_X_WORLD_BOUNDARY,
             RIGHT_X_WORLD_BOUNDARY,
@@ -126,12 +126,23 @@ namespace GRAPHICS
 
                 // Y must be flipped since the world Y coordinates are positive going up,
                 // the opposite is true for the screen coordinates.
-                vertex.Y = -vertex.Y;
+                /// @todo   No duplication here? vertex.Y = -vertex.Y;
                 MATH::Vector4f homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(vertex);
 
                 MATH::Vector4f world_vertex = object_world_transform * homogeneous_vertex;
                 MATH::Vector4f view_vertex = camera_view_transform * world_vertex;
-                MATH::Vector4f projected_vertex = perspective_projection_transform * view_vertex;
+
+                MATH::Vector4f projected_vertex;
+                switch (Camera.Projection)
+                {
+                    case ProjectionType::ORTHOGRAPHIC:
+                        projected_vertex = orthographic_projection_transform * view_vertex;
+                        break;
+                    case ProjectionType::PERSPECTIVE:
+                        projected_vertex = perspective_projection_transform * view_vertex;
+                        break;
+                } 
+
                 MATH::Vector4f screen_vertex = screen_transform * projected_vertex;
                 MATH::Vector4f transformed_vertex = screen_vertex;
 
@@ -183,6 +194,11 @@ namespace GRAPHICS
                 }
 
                 Color light_total_color = Color::BLACK;
+                /// @todo   Figure this out...how to handle no lights?
+                if (lights.empty())
+                {
+                    light_total_color = Color(1.0f, 1.0f, 1.0f, 1.0f);
+                }
                 for (const Light& light : lights)
                 {
                     // COMPUTE SHADING BASED ON TYPE OF LIGHT.
