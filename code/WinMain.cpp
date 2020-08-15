@@ -84,10 +84,73 @@ LRESULT CALLBACK MainWindowCallback(
         case WM_KEYDOWN:
         {
 #if 1
+            constexpr float CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS = 1.0f;
+            constexpr float CAMERA_ROTATE_DEGREES_PER_KEY_PRESS = 1.0f;
             int virtual_key_code = static_cast<int>(w_param);
             // https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
             switch (virtual_key_code)
             {
+                case VK_UP:
+                    g_camera.WorldPosition.Y += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    break;
+                case VK_DOWN:
+                    g_camera.WorldPosition.Y -= CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    break;
+                case VK_LEFT:
+                    g_camera.WorldPosition.X -= CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    break;
+                case VK_RIGHT:
+                    g_camera.WorldPosition.X += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    break;
+                case 0x57: // W
+                    g_camera.WorldPosition.Z -= CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    break;
+                case 0x53: // S
+                    g_camera.WorldPosition.Z += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    break;
+                case 0x41: // A
+                {
+                    /// @todo   These rotation angles seem backward...maybe should more specifically work out math?
+                    MATH::Angle<float>::Degrees degrees(CAMERA_ROTATE_DEGREES_PER_KEY_PRESS);
+                    MATH::Matrix4x4f rotation_matrix = MATH::Matrix4x4f::RotateY(MATH::Angle<float>::DegreesToRadians(degrees));
+                    MATH::Vector4f transformed_position = rotation_matrix * MATH::Vector4f::HomogeneousPositionVector(g_camera.WorldPosition);
+                    /// @todo   This is a bit of a hack, but it works nicely.  Probably want to simplify camera.
+                    g_camera.WorldPosition = MATH::Vector3f(transformed_position.X, transformed_position.Y, transformed_position.Z);
+                    g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(), g_camera.WorldPosition);
+                    break;
+                }
+                case 0x44: // D
+                {
+                    /// @todo   These rotation angles seem backward...maybe should more specifically work out math?
+                    MATH::Angle<float>::Degrees degrees(-CAMERA_ROTATE_DEGREES_PER_KEY_PRESS);
+                    MATH::Matrix4x4f rotation_matrix = MATH::Matrix4x4f::RotateY(MATH::Angle<float>::DegreesToRadians(degrees));
+                    MATH::Vector4f transformed_position = rotation_matrix * MATH::Vector4f::HomogeneousPositionVector(g_camera.WorldPosition);
+                    /// @todo   This is a bit of a hack, but it works nicely.  Probably want to simplify camera.
+                    g_camera.WorldPosition = MATH::Vector3f(transformed_position.X, transformed_position.Y, transformed_position.Z);
+                    g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(), g_camera.WorldPosition);
+                    break;
+                }
+                case 0x51: // Q
+                {
+                    MATH::Angle<float>::Degrees degrees(CAMERA_ROTATE_DEGREES_PER_KEY_PRESS);
+                    MATH::Matrix4x4f rotation_matrix = MATH::Matrix4x4f::RotateX(MATH::Angle<float>::DegreesToRadians(degrees));
+                    MATH::Vector4f transformed_position = rotation_matrix * MATH::Vector4f::HomogeneousPositionVector(g_camera.WorldPosition);
+                    /// @todo   This is a bit of a hack, but it works nicely.  Probably want to simplify camera.
+                    g_camera.WorldPosition = MATH::Vector3f(transformed_position.X, transformed_position.Y, transformed_position.Z);
+                    g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(), g_camera.WorldPosition);
+                    break;
+                }
+                case 0x5A: // Z
+                {
+                    MATH::Angle<float>::Degrees degrees(-CAMERA_ROTATE_DEGREES_PER_KEY_PRESS);
+                    MATH::Matrix4x4f rotation_matrix = MATH::Matrix4x4f::RotateX(MATH::Angle<float>::DegreesToRadians(degrees));
+                    MATH::Vector4f transformed_position = rotation_matrix * MATH::Vector4f::HomogeneousPositionVector(g_camera.WorldPosition);
+                    /// @todo   This is a bit of a hack, but it works nicely.  Probably want to simplify camera.
+                    g_camera.WorldPosition = MATH::Vector3f(transformed_position.X, transformed_position.Y, transformed_position.Z);
+                    g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(), g_camera.WorldPosition);
+                    break;
+                }
+
                 /// @todo
                 case 0x31: // 1
                 {
@@ -105,7 +168,7 @@ LRESULT CALLBACK MainWindowCallback(
                             g_software_render_target = std::make_unique<GRAPHICS::RenderTarget>(400, 400, GRAPHICS::ColorFormat::ARGB);
                         }
 
-                        g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
+                        //g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
 
                         g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
                     }
@@ -121,7 +184,7 @@ LRESULT CALLBACK MainWindowCallback(
                             g_ray_tracer = std::make_unique<GRAPHICS::RAY_TRACING::RayTracingAlgorithm>();
                         }
 
-                        g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
+                        //g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
 
                         g_current_renderer_type = RendererType::SOFTWARE_RAY_TRACER;
                     }
@@ -166,12 +229,6 @@ LRESULT CALLBACK MainWindowCallback(
                         /// @todo   Where to put these?
                         /// @todo   Centralize screen dimensions!
                         glViewport(0, 0, 400, 400);
-
-                        glMatrixMode(GL_PROJECTION);
-                        glLoadIdentity();
-                        glOrtho(-200.0f, 200.0f, -200.0f, 200.0f, -1.0f, 1.0f);
-                        glMatrixMode(GL_MODELVIEW);
-                        glLoadIdentity();
 
                         g_current_renderer_type = RendererType::OPEN_GL;
                     }

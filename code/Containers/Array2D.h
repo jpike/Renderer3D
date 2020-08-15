@@ -46,6 +46,7 @@ namespace CONTAINERS
         T& operator()(const unsigned int x, const unsigned int y);
         const T& operator()(const unsigned int x, const unsigned int y) const;
         const T* ValuesInRowMajorOrder() const;
+        std::vector<T> ValuesInColumnMajorOrder() const;
 
     private:
         // HELPER METHODS.
@@ -219,6 +220,28 @@ namespace CONTAINERS
     const T* Array2D<T>::ValuesInRowMajorOrder() const
     {
         return Data.data();
+    }
+
+    /// Gets a copy of the values in the array in column-major order
+    /// (all values for each column before the next column).
+    /// @return The array values in column-major order.
+    template <typename T>
+    std::vector<T> Array2D<T>::ValuesInColumnMajorOrder() const
+    {
+        std::vector<T> values_in_column_major_order;
+
+        unsigned int width = GetWidth();
+        unsigned int height = GetHeight();
+        for (unsigned int column_index = 0; column_index < width; ++column_index)
+        {
+            for (unsigned int row_index = 0; row_index < height; ++row_index)
+            {
+                const T& current_value = (*this)(column_index, row_index);
+                values_in_column_major_order.push_back(current_value);
+            }
+        }
+
+        return values_in_column_major_order;
     }
 
     /// Converts the provided 2D coordinates to a 1D array index.

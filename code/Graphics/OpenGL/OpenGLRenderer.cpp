@@ -8,14 +8,40 @@ namespace GRAPHICS::OPEN_GL
     /// @param[in]  camera - The camera to use to view the scene.
     void OpenGLRenderer::Render(const Scene& scene, const Camera& camera) const
     {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+
+        if (ProjectionType::ORTHOGRAPHIC == camera.Projection)
+        {
+            /// @todo   Centralize screen dimensions!
+            glOrtho(
+                camera.WorldPosition.X - 200.0f, 
+                camera.WorldPosition.X + 200.0f,
+                camera.WorldPosition.Y - 200.0f,
+                camera.WorldPosition.Y + 200.0f,
+                -1.0f,
+                1.0f);
+        }
+        /// @todo   Perspective!
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+        MATH::Matrix4x4f view_matrix = camera.ViewTransform();
+        glLoadMatrixf(view_matrix.Elements.ValuesInColumnMajorOrder().data());
+
         ClearScreen(scene.BackgroundColor);
 
         // RENDER EACH OBJECT IN THE SCENE.
         for (const auto& object_3D : scene.Objects)
         {
-            /// @todo
-            camera;
+            glPushMatrix();
+            glLoadIdentity();
+            MATH::Matrix4x4f world_matrix = object_3D.WorldTransform();
+            glLoadMatrixf(world_matrix.Elements.ValuesInColumnMajorOrder().data());
+            
             Render(object_3D);
+
+            glPopMatrix();
         }
     }
 
