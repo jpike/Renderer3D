@@ -1,7 +1,9 @@
 #pragma once
 
+#include "Graphics/Camera.h"
 #include "Graphics/Color.h"
 #include "Graphics/Object3D.h"
+#include "Graphics/Scene.h"
 
 namespace GRAPHICS::OPEN_GL
 {
@@ -9,7 +11,9 @@ namespace GRAPHICS::OPEN_GL
     class OpenGLRenderer
     {
     public:
-        void ClearScreen(const Color& color);
-        void Render(const Object3D& object_3D);
+        void Render(const Scene& scene, const Camera& camera) const;
+
+        void ClearScreen(const Color& color) const;
+        void Render(const Object3D& object_3D) const;
     };
 }

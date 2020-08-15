@@ -44,26 +44,42 @@ namespace GRAPHICS
         }
     }
 
+    /// Renders an entire 3D scene.
+    /// @param[in]  scene - The scene to render.
+    /// @param[in]  camera - The camera to use to view the scene.
+    /// @param[in,out]  render_target - The target to render to.
+    void Renderer::Render(const Scene& scene, const Camera& camera, RenderTarget& render_target) const
+    {
+        render_target.FillPixels(scene.BackgroundColor);
+
+        // RENDER EACH OBJECT IN THE SCENE.
+        for (const auto& object_3D : scene.Objects)
+        {
+            Render(object_3D, scene.PointLights, camera, render_target);
+        }
+    }
+
     /// Renders a 3D object to the render target.
     /// @param[in]  object_3D - The object to render.
     /// @param[in]  lights - Any lights that should illuminate the object.
+    /// @param[in]  camera - The camera to use to view the object.
     /// @param[in,out]  render_target - The target to render to.
-    void Renderer::Render(const Object3D& object_3D, const std::vector<Light>& lights, RenderTarget& render_target) const
+    void Renderer::Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, RenderTarget& render_target) const
     {
         // COMPUTE THE FINAL TRANSFORMATION MATRIX FOR THE OBJECT.
         MATH::Matrix4x4f object_world_transform = object_3D.WorldTransform();
-        MATH::Matrix4x4f camera_view_transform = Camera.ViewTransform();
+        MATH::Matrix4x4f camera_view_transform = camera.ViewTransform();
 
         /// @todo   Figure out how we want to put projections into camera class.
         constexpr float WORLD_HALF_SIZE = 200.0f;
-        const float LEFT_X_WORLD_BOUNDARY = Camera.WorldPosition.X - WORLD_HALF_SIZE;
-        const float RIGHT_X_WORLD_BOUNDARY = Camera.WorldPosition.X + WORLD_HALF_SIZE;
-        const float BOTTOM_Y_WORLD_BOUNDARY = Camera.WorldPosition.Y - WORLD_HALF_SIZE;
-        const float TOP_Y_WORLD_BOUNDARY = Camera.WorldPosition.Y + WORLD_HALF_SIZE;
-        //const float NEAR_Z_WORLD_BOUNDARY = Camera.WorldPosition.Z - 0.5f;
-        //const float FAR_Z_WORLD_BOUNDARY = Camera.WorldPosition.Z - 2.5f;
-        const float NEAR_Z_WORLD_BOUNDARY = Camera.WorldPosition.Z - 1.0f;
-        const float FAR_Z_WORLD_BOUNDARY = Camera.WorldPosition.Z - 3.0f; //- 500.0f;
+        const float LEFT_X_WORLD_BOUNDARY = camera.WorldPosition.X - WORLD_HALF_SIZE;
+        const float RIGHT_X_WORLD_BOUNDARY = camera.WorldPosition.X + WORLD_HALF_SIZE;
+        const float BOTTOM_Y_WORLD_BOUNDARY = camera.WorldPosition.Y - WORLD_HALF_SIZE;
+        const float TOP_Y_WORLD_BOUNDARY = camera.WorldPosition.Y + WORLD_HALF_SIZE;
+        //const float NEAR_Z_WORLD_BOUNDARY = camera.WorldPosition.Z - 0.5f;
+        //const float FAR_Z_WORLD_BOUNDARY = camera.WorldPosition.Z - 2.5f;
+        const float NEAR_Z_WORLD_BOUNDARY = camera.WorldPosition.Z - 1.0f;
+        const float FAR_Z_WORLD_BOUNDARY = camera.WorldPosition.Z - 3.0f; //- 500.0f;
         MATH::Matrix4x4f orthographic_projection_transform = Camera::OrthographicProjection(
             LEFT_X_WORLD_BOUNDARY,
             RIGHT_X_WORLD_BOUNDARY,
@@ -133,7 +149,7 @@ namespace GRAPHICS
                 MATH::Vector4f view_vertex = camera_view_transform * world_vertex;
 
                 MATH::Vector4f projected_vertex;
-                switch (Camera.Projection)
+                switch (camera.Projection)
                 {
                     case ProjectionType::ORTHOGRAPHIC:
                         projected_vertex = orthographic_projection_transform * view_vertex;
@@ -260,7 +276,7 @@ namespace GRAPHICS
                             MATH::Vector3f reflected_light_direction = reflected_light_along_surface_normal - unit_direction_from_point_to_light;
                             MATH::Vector3f unit_reflected_light_direction = MATH::Vector3f::Normalize(reflected_light_direction);
 
-                            MATH::Vector3f ray_from_vertex_to_camera = Camera.WorldPosition - current_world_vertex;
+                            MATH::Vector3f ray_from_vertex_to_camera = camera.WorldPosition - current_world_vertex;
                             MATH::Vector3f normalized_ray_from_vertex_to_camera = MATH::Vector3f::Normalize(ray_from_vertex_to_camera);
                             float specular_proportion = MATH::Vector3f::DotProduct(normalized_ray_from_vertex_to_camera, unit_reflected_light_direction);
                             specular_proportion = std::max(NO_ILLUMINATION, specular_proportion);

@@ -9,6 +9,7 @@ namespace GRAPHICS
 {
 namespace RAY_TRACING
 {
+#if TODO_ADD_BACK_IN_SUPPORT_FOR_SPHERES
     /// A sphere that can be ray traced.
     class Sphere : public IObject3D
     {
@@ -26,5 +27,6 @@ namespace RAY_TRACING
         /// The material defining surface properties of the sphere.
         std::shared_ptr<Material> Material = nullptr;
     };
+#endif
 }
 }

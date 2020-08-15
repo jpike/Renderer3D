@@ -8,6 +8,7 @@
 #include "Graphics/Light.h"
 #include "Graphics/Object3D.h"
 #include "Graphics/RenderTarget.h"
+#include "Graphics/Scene.h"
 #include "Graphics/Triangle.h"
 
 namespace GRAPHICS
@@ -18,11 +19,8 @@ namespace GRAPHICS
     public:
         // RENDERING.
         void Render(const GUI::Text& text, RenderTarget& render_target) const;
-        void Render(const Object3D& object_3D, const std::vector<Light>& lights, RenderTarget& render_target) const;
-
-        // PUBLIC MEMBER VARIABLES FOR EASY ACCESS.
-        /// The camera for viewing 3D scenes that get rendered.
-        GRAPHICS::Camera Camera;
+        void Render(const Scene& scene, const Camera& camera, RenderTarget& render_target) const;
+        void Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, RenderTarget& render_target) const;
 
     private:
         // RENDERING.

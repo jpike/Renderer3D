@@ -62,26 +62,6 @@ namespace GRAPHICS
         return normalized_surface_normal;
     }
 
-    /// Computes the surface normal of the triangle at given point.
-    /// Same at all places for a triangle.
-    /// @param[in]  surface_point - The point on the triangle's surface at which to compute a normal.
-    /// @return The unit surface normal at the specified point.
-    MATH::Vector3f Triangle::SurfaceNormal(const MATH::Vector3f& surface_point) const
-    {
-        // This parameter is unneeded for triangles since they have consistent normals.
-        surface_point;
-
-        MATH::Vector3f normalized_surface_normal = SurfaceNormal();
-        return normalized_surface_normal;
-    }
-
-    /// Gets the material defining surface properties of the object.
-    /// @return The material for the object.
-    const Material* Triangle::GetMaterial() const
-    {
-        return Material.get();
-    }
-
     /// Checks for an intersection between a ray and the object.
     /// @param[in]  ray - The ray to check for intersection.
     /// @return A ray-object intersection, if one occurred; std::nullopt otherwise.
@@ -127,7 +107,7 @@ namespace GRAPHICS
         RAY_TRACING::RayObjectIntersection intersection;
         intersection.Ray = &ray;
         intersection.DistanceFromRayToObject = distance_from_ray_to_object;
-        intersection.Object = this;
+        intersection.Triangle = this;
         return intersection;
     }
 }

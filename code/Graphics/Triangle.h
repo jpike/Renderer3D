@@ -3,8 +3,8 @@
 #include <array>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include "Graphics/Material.h"
-#include "Graphics/RayTracing/IObject3D.h"
 #include "Graphics/RayTracing/Ray.h"
 #include "Graphics/RayTracing/RayObjectIntersection.h"
 #include "Math/Vector3.h"
@@ -12,7 +12,7 @@
 namespace GRAPHICS
 {
     /// A triangle that can be rendered.
-    class Triangle : public RAY_TRACING::IObject3D
+    class Triangle
     {
     public:
         // STATIC CONSTANTS.
@@ -26,9 +26,7 @@ namespace GRAPHICS
 
         // OTHER METHODS.
         MATH::Vector3f SurfaceNormal() const;
-        MATH::Vector3f SurfaceNormal(const MATH::Vector3f& surface_point) const override;
-        const Material* GetMaterial() const override;
-        std::optional<RAY_TRACING::RayObjectIntersection> Intersect(const RAY_TRACING::Ray& ray) const override;
+        std::optional<RAY_TRACING::RayObjectIntersection> Intersect(const RAY_TRACING::Ray& ray) const;
 
         // PUBLIC MEMBER VARIABLES FOR EASY ACCESS.
         /// The material of the triangle.

@@ -6,11 +6,11 @@
 
 namespace GRAPHICS
 {
+    // Forward declarations.
+    class Triangle;
+
 namespace RAY_TRACING
 {
-    // Forward declarations.
-    class IObject3D;
-
     /// An intersection between a ray and an object in a 3D scene.
     class RayObjectIntersection
     {
@@ -25,8 +25,8 @@ namespace RAY_TRACING
         /// Initialized to infinity to avoid accidental intersections caused by checking
         /// if this distance is closer between two intersections.
         float DistanceFromRayToObject = std::numeric_limits<float>::infinity();
-        /// The intersected object.  Memory is managed externally (outside of this class).
-        const IObject3D* Object = nullptr;
+        /// The intersected triangle.  Memory is managed externally (outside of this class).
+        const Triangle* Triangle = nullptr;
     };
 }
 }

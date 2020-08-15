@@ -1,4 +1,5 @@
 #include "Graphics/Cube.h"
+#include "Graphics/Triangle.h"
 
 namespace GRAPHICS
 {

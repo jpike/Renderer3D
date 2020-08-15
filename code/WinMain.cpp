@@ -14,6 +14,7 @@
 #include "Graphics/OpenGL/OpenGLRenderer.h"
 #include "Graphics/RayTracing/RayTracingAlgorithm.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/Scene.h"
 #include "Graphics/Triangle.h"
 #include "Windowing/Win32Window.h"
 
@@ -30,8 +31,9 @@ enum class RendererType
 // Global to provide access to them within the window procedure.
 /// The window for the application.
 static std::unique_ptr<WINDOWING::Win32Window> g_window = nullptr;
-/// The objects currently being rendered.
-static std::vector<GRAPHICS::Object3D> g_objects;
+/// The scene currently being rendered.
+static GRAPHICS::Scene g_scene;
+static GRAPHICS::Camera g_camera;
 /// The type of renderer currently being used.
 static RendererType g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
 /// The software rasterizer.
@@ -103,8 +105,7 @@ LRESULT CALLBACK MainWindowCallback(
                             g_software_render_target = std::make_unique<GRAPHICS::RenderTarget>(400, 400, GRAPHICS::ColorFormat::ARGB);
                         }
 
-                        /// @todo   Global camera?
-                        g_software_rasterizer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
+                        g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
 
                         g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
                     }
@@ -120,8 +121,7 @@ LRESULT CALLBACK MainWindowCallback(
                             g_ray_tracer = std::make_unique<GRAPHICS::RAY_TRACING::RayTracingAlgorithm>();
                         }
 
-                        /// @todo   Global camera?
-                        g_ray_tracer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 1.0f));
+                        g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
 
                         g_current_renderer_type = RendererType::SOFTWARE_RAY_TRACER;
                     }
@@ -264,8 +264,8 @@ int CALLBACK WinMain(
         /// @todo   Centralize screen dimensions.
         g_software_render_target = std::make_unique<GRAPHICS::RenderTarget>(400, 400, GRAPHICS::ColorFormat::ARGB);
     }
-    /// @todo   Global camera?
-    g_software_rasterizer->Camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
+    
+    g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
     g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
 
     // CREATE EXAMPLE OBJECTS.
@@ -283,7 +283,7 @@ int CALLBACK WinMain(
                 MATH::Vector3f(200.0f, -200.0f, 0.0f)
             })
     };
-    g_objects.push_back(triangle_object);
+    g_scene.Objects.push_back(triangle_object);
 
     // RUN A MESSAGE LOOP.
     constexpr float TARGET_FRAMES_PER_SECOND = 60.0f;
@@ -334,15 +334,21 @@ int CALLBACK WinMain(
         {
             case RendererType::SOFTWARE_RASTERIZER:
             {
-                // CLEAR THE SCREEN FROM THE PREVIOUS FRAME.
-                g_software_render_target->FillPixels(GRAPHICS::Color::BLACK);
+                // RENDER THE SCENE.
+                g_scene.BackgroundColor = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f);
+                g_software_rasterizer->Render(g_scene, g_camera, *g_software_render_target);
 
-                // RENDER ALL OBJECTS.
-                for (auto object_3D : g_objects)
-                {
-                    const std::vector<GRAPHICS::Light> NO_LIGHTS_YET;
-                    g_software_rasterizer->Render(object_3D, NO_LIGHTS_YET, *g_software_render_target);
-                }
+                // DISPLAY THE RENDERED OBJECTS IN THE WINDOW.
+                g_window->Display(*g_software_render_target);
+
+                break;
+            }
+            case RendererType::SOFTWARE_RAY_TRACER:
+            {
+                g_scene.BackgroundColor = GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f);
+                g_camera.ViewingPlane.Width = static_cast<float>(SCREEN_WIDTH_IN_PIXELS);
+                g_camera.ViewingPlane.Height = static_cast<float>(SCREEN_HEIGHT_IN_PIXELS);
+                g_ray_tracer->Render(g_scene, g_camera, *g_software_render_target);
 
                 // DISPLAY THE RENDERED OBJECTS IN THE WINDOW.
                 g_window->Display(*g_software_render_target);
@@ -351,11 +357,8 @@ int CALLBACK WinMain(
             }
             case RendererType::OPEN_GL:
             {
-                g_open_gl_renderer->ClearScreen(GRAPHICS::Color::BLACK);
-                for (const auto& object_3D : g_objects)
-                {
-                    g_open_gl_renderer->Render(object_3D);
-                }
+                g_scene.BackgroundColor = GRAPHICS::Color(0.0f, 0.0f, 1.0f, 1.0f);
+                g_open_gl_renderer->Render(g_scene, g_camera);
 
                 glFlush();
 

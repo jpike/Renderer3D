@@ -5,6 +5,7 @@ namespace GRAPHICS
 {
 namespace RAY_TRACING
 {
+#if TODO_ADD_BACK_IN_SUPPORT_FOR_SPHERES
     /// Computes the surface normal of the sphere at given point.
     /// @param[in]  surface_point - The point on the sphere's surface at which to compute a normal.
     /// @return The unit surface normal at the specified point.
@@ -153,5 +154,6 @@ namespace RAY_TRACING
         // INDICATE THAT NO INTERSECTION OCCURRED.
         return std::nullopt;
     }
+#endif
 }
 }

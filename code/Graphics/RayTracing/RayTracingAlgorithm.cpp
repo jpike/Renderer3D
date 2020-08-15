@@ -9,8 +9,9 @@ namespace RAY_TRACING
 {
     /// Renders a scene to the specified render target.
     /// @param[in]  scene - The scene to render.
+    /// @param[in]  camera - The camera to use to view the scene.
     /// @param[in,out]  render_target - The target to render to.
-    void RayTracingAlgorithm::Render(const Scene& scene, GRAPHICS::RenderTarget& render_target)
+    void RayTracingAlgorithm::Render(const Scene& scene, const Camera& camera, GRAPHICS::RenderTarget& render_target)
     {
         // RENDER EACH ROW OF PIXELS.
         unsigned int render_target_height_in_pixels = render_target.GetHeightInPixels();
@@ -22,7 +23,7 @@ namespace RAY_TRACING
             {
                 // COMPUTE THE VIEWING RAY.
                 MATH::Vector2ui pixel_coordinates(x, y);
-                Ray ray = Camera.ViewingRay(pixel_coordinates, render_target);
+                Ray ray = camera.ViewingRay(pixel_coordinates, render_target);
 
                 // FIND THE CLOSEST OBJECT IN THE SCENE THAT THE RAY INTERSECTS.
                 std::optional<RayObjectIntersection> closest_intersection = ComputeClosestIntersection(scene, ray);
@@ -32,6 +33,13 @@ namespace RAY_TRACING
                 {
                     // COMPUTE THE CURRENT PIXEL'S COLOR.
                     Color color = ComputeColor(scene, *closest_intersection, ReflectionCount);
+
+                    /// @todo   Fix color hack.
+                    if (ShadingType::FLAT == closest_intersection->Triangle->Material->Shading)
+                    {
+                        color = closest_intersection->Triangle->Material->FaceColor;
+                    }
+
                     render_target.WritePixel(x, y, color);
                 }
                 else
@@ -60,7 +68,7 @@ namespace RAY_TRACING
         Color final_color = Color::BLACK;
 
         // ADD IN THE AMBIENT COLOR IF ENABLED.
-        const Material* intersected_material = intersection.Object->GetMaterial();
+        const std::shared_ptr<Material>& intersected_material = intersection.Triangle->Material;
         if (Ambient)
         {
             final_color += intersected_material->AmbientColor;
@@ -81,7 +89,7 @@ namespace RAY_TRACING
                 // SHOOT A SHADOW RAY OUT FROM THE INTERSECTION POINT TO THE LIGHT.
                 MATH::Vector3f direction_from_point_to_light = light.PointLightDirectionFrom(intersection_point);
                 Ray shadow_ray(intersection_point, direction_from_point_to_light);
-                std::optional<RayObjectIntersection> shadow_intersection = ComputeClosestIntersection(scene, shadow_ray, intersection.Object);
+                std::optional<RayObjectIntersection> shadow_intersection = ComputeClosestIntersection(scene, shadow_ray, intersection.Triangle);
                 if (shadow_intersection)
                 {
                     // DETERMINE THE SHADOW FACTOR BASED ON THE INTERSECTION.
@@ -111,7 +119,7 @@ namespace RAY_TRACING
         }
 
         // ADD IN DIFFUSE COLOR FROM LIGHTS IF ENABLED.
-        MATH::Vector3f unit_surface_normal = intersection.Object->SurfaceNormal(intersection_point);
+        MATH::Vector3f unit_surface_normal = intersection.Triangle->SurfaceNormal();
         if (Diffuse)
         {
             // ADD DIFFUSE CONTRIBUTIONS FROM ALL LIGHT SOURCES.
@@ -211,7 +219,7 @@ namespace RAY_TRACING
             Ray reflected_ray(intersection_point, normalized_reflected_ray_direction);
 
             // CHECK FOR ANY INTERSECTIONS FROM THE REFLECTED RAY.
-            std::optional<RayObjectIntersection> reflected_intersection = ComputeClosestIntersection(scene, reflected_ray, intersection.Object);
+            std::optional<RayObjectIntersection> reflected_intersection = ComputeClosestIntersection(scene, reflected_ray, intersection.Triangle);
             if (reflected_intersection)
             {
                 // COMPUTE THE REFLECTED COLOR.
@@ -243,42 +251,46 @@ namespace RAY_TRACING
     std::optional<RayObjectIntersection> RayTracingAlgorithm::ComputeClosestIntersection(
         const Scene& scene,
         const Ray& ray,
-        const IObject3D* const ignored_object) const
+        const Triangle* const ignored_object) const
     {
         // FIND THE CLOSEST OBJECT IN THE SCENE THAT THE RAY INTERSECTS.
         std::optional<RayObjectIntersection> closest_intersection = std::nullopt;
         for (const auto& current_object : scene.Objects)
         {
-            // SKIP OVER THE CURRENT OBJECT IF IT SHOULD BE IGNORED.
-            bool ignore_current_object = (ignored_object == current_object.get());
-            if (ignore_current_object)
+            /// @todo   Convert things to operate on triangles as opposed to "objects"?
+            for (const auto& current_triangle : current_object.Triangles)
             {
-                continue;
-            }
-
-            // CHECK IF THE RAY INTERSECTS THE CURRENT OBJECT.
-            std::optional<RayObjectIntersection> intersection = current_object->Intersect(ray);
-            bool ray_hit_object = (std::nullopt != intersection);
-            if (!ray_hit_object)
-            {
-                // CONTINUE SEEING IF OTHER OBJECTS ARE HIT.
-                continue;
-            }
-
-            // UPDATE THE CLOSEST INTERSECTION APPROPRIATELY.
-            if (closest_intersection)
-            {
-                // ONLY OVERWRITE THE CLOSEST INTERSECTION IF THE NEWEST ONE IS CLOSER.
-                bool new_intersection_closer = (intersection->DistanceFromRayToObject < closest_intersection->DistanceFromRayToObject);
-                if (new_intersection_closer)
+                // SKIP OVER THE CURRENT OBJECT IF IT SHOULD BE IGNORED.
+                bool ignore_current_object = (ignored_object == &current_triangle);
+                if (ignore_current_object)
                 {
+                    continue;
+                }
+
+                // CHECK IF THE RAY INTERSECTS THE CURRENT OBJECT.
+                std::optional<RayObjectIntersection> intersection = current_triangle.Intersect(ray);
+                bool ray_hit_object = (std::nullopt != intersection);
+                if (!ray_hit_object)
+                {
+                    // CONTINUE SEEING IF OTHER OBJECTS ARE HIT.
+                    continue;
+                }
+
+                // UPDATE THE CLOSEST INTERSECTION APPROPRIATELY.
+                if (closest_intersection)
+                {
+                    // ONLY OVERWRITE THE CLOSEST INTERSECTION IF THE NEWEST ONE IS CLOSER.
+                    bool new_intersection_closer = (intersection->DistanceFromRayToObject < closest_intersection->DistanceFromRayToObject);
+                    if (new_intersection_closer)
+                    {
+                        closest_intersection = intersection;
+                    }
+                }
+                else
+                {
+                    // SET THIS FIRST INTERSECTION AS THE CLOSEST.
                     closest_intersection = intersection;
                 }
-            }
-            else
-            {
-                // SET THIS FIRST INTERSECTION AS THE CLOSEST.
-                closest_intersection = intersection;
             }
         }
 

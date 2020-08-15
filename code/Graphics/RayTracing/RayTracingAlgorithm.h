@@ -3,27 +3,23 @@
 #include <optional>
 #include "Graphics/Camera.h"
 #include "Graphics/Color.h"
-#include "Graphics/RayTracing/IObject3D.h"
 #include "Graphics/RayTracing/Ray.h"
 #include "Graphics/RayTracing/RayObjectIntersection.h"
-#include "Graphics/RayTracing/Scene.h"
 #include "Graphics/RenderTarget.h"
+#include "Graphics/Scene.h"
 
-namespace GRAPHICS
-{
 /// Holds code related to ray tracing.
-namespace RAY_TRACING
+namespace GRAPHICS::RAY_TRACING
 {
     /// A basic ray tracing algorithm.
+    /// @todo   Add back in support for spheres.
     class RayTracingAlgorithm
     {
     public:
         // PUBLIC METHODS.
-        void Render(const Scene& scene, GRAPHICS::RenderTarget& render_target);
+        void Render(const Scene& scene, const Camera& camera, GRAPHICS::RenderTarget& render_target);
 
         // PUBLIC MEMBER VARIABLES FOR EASY ACCESS.
-        /// The camera used for rendering.
-        GRAPHICS::Camera Camera = GRAPHICS::Camera();
         /// True if ambient lighting should be calculated; false otherwise.
         bool Ambient = true;
         /// True if shadows should be calculated; false otherwise.
@@ -47,7 +43,6 @@ namespace RAY_TRACING
         std::optional<RayObjectIntersection> ComputeClosestIntersection(
             const Scene& scene,
             const Ray& ray,
-            const IObject3D* const ignored_object = nullptr) const;
+            const Triangle* const ignored_object = nullptr) const;
     };
-}
 }
