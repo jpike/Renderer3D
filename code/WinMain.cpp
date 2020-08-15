@@ -239,6 +239,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
         case 0:
         {
             // BASIC WHITE TRIANGLE.
+            OutputDebugString("\nBasic white triangle");
             std::shared_ptr<GRAPHICS::Material> material = std::make_shared<GRAPHICS::Material>();
             material->Shading = GRAPHICS::ShadingType::FLAT;
             material->FaceColor = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f);
@@ -260,6 +261,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
         case 1:
         {
             // OLDER BASIC TRIANGLE.
+            OutputDebugString("\nOld basic triangle");
             const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
             GRAPHICS::Triangle triangle = GRAPHICS::Triangle::CreateEquilateral(material);
             GRAPHICS::Object3D larger_triangle;
@@ -274,6 +276,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
         case 2:
         {
             // MANY SMALL TRIANGLES.
+            OutputDebugString("\nMany small triangles");
             constexpr std::size_t SMALL_TRIANGLE_COUNT = 300;
             std::random_device random_number_generator;
             GRAPHICS::Scene scene;
@@ -294,10 +297,11 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
         }
         case 3:
         {
+            OutputDebugString("\nCube");
             const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
             GRAPHICS::Object3D cube = GRAPHICS::Cube::Create(material);
-            cube.Scale = MATH::Vector3f(10.0f, 10.0f, 10.0f);
-            cube.WorldPosition = MATH::Vector3f(0.0f, 0.0f, 0.0f);
+            //cube.Scale = MATH::Vector3f(10.0f, 10.0f, 10.0f);
+            cube.WorldPosition = MATH::Vector3f(0.0f, 0.0f, -2.0f);
 
             GRAPHICS::Scene scene;
             scene.Objects.push_back(cube);
@@ -305,6 +309,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
         }
         case 4:
         {
+            OutputDebugString("\nCube from file");
             GRAPHICS::Scene scene;
             const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
             std::optional<GRAPHICS::Object3D> cube_from_file = GRAPHICS::MODELING::WavefrontObjectModel::Load("../assets/default_cube.obj");
@@ -317,6 +322,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
                     loaded_triangle.Material = material;
                 }
 #endif
+                cube_from_file->WorldPosition = MATH::Vector3f(0.0f, 0.0f, -2.0f);
                 scene.Objects.push_back(*cube_from_file);
             }
 
@@ -779,6 +785,24 @@ int CALLBACK WinMain(
                 MATH::Vector2f(1.0f, 0.0f),
                 MATH::Vector2f(0.0f, 1.0f)
             }
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            /// @todo   Make this get values directly from the "material".
+            .Shading = GRAPHICS::ShadingType::TEXTURED,
+            .VertexColors =
+            {
+                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            },
+            .Texture = texture,
+            .VertexTextureCoordinates =
+            {
+                MATH::Vector2f(0.0f, 0.0f),
+                MATH::Vector2f(1.0f, 0.0f),
+                MATH::Vector2f(0.0f, 1.0f)
+            }
         })
     };
 
@@ -837,9 +861,12 @@ int CALLBACK WinMain(
         for (auto& object_3D : g_scene.Objects)
         {
             object_3D;
-            object_3D.RotationInRadians.X = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
-            object_3D.RotationInRadians.Y = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
-            object_3D.RotationInRadians.Z = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+#define ROTATE_OBJECTS 1
+#if ROTATE_OBJECTS
+            //object_3D.RotationInRadians.X = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            //object_3D.RotationInRadians.Y = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            //object_3D.RotationInRadians.Z = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+#endif
         }
 
         // RENDER THE SCENE BASED ON THE CURRENT RENDERER.

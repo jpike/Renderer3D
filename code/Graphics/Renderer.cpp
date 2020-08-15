@@ -142,7 +142,8 @@ namespace GRAPHICS
 
                 // Y must be flipped since the world Y coordinates are positive going up,
                 // the opposite is true for the screen coordinates.
-                /// @todo   No duplication here? vertex.Y = -vertex.Y;
+                /// @todo   No duplication here? 
+                vertex.Y = -vertex.Y;
                 MATH::Vector4f homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(vertex);
 
                 MATH::Vector4f world_vertex = object_world_transform * homogeneous_vertex;

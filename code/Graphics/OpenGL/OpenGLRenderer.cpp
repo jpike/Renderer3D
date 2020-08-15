@@ -25,11 +25,22 @@ namespace GRAPHICS::OPEN_GL
         }
         else if (ProjectionType::PERSPECTIVE == camera.Projection)
         {
-            const MATH::Angle<float>::Degrees VERTICAL_FIELD_OF_VIEW_IN_DEGREES(90.0f);
-            const float ASPECT_RATIO_WIDTH_OVER_HEIGHT = 1.0f;
             const float NEAR_Z_WORLD_BOUNDARY = 1.0f;
             const float FAR_Z_WORLD_BOUNDARY = 500.0f;
+#define GLU 1
+#if GLU
+            const MATH::Angle<float>::Degrees VERTICAL_FIELD_OF_VIEW_IN_DEGREES(90.0f);
+            const float ASPECT_RATIO_WIDTH_OVER_HEIGHT = 1.0f;
             gluPerspective(VERTICAL_FIELD_OF_VIEW_IN_DEGREES.Value, ASPECT_RATIO_WIDTH_OVER_HEIGHT, NEAR_Z_WORLD_BOUNDARY, FAR_Z_WORLD_BOUNDARY);
+#else
+            glFrustum(
+                camera.WorldPosition.X - 200.0f,
+                camera.WorldPosition.X + 200.0f,
+                camera.WorldPosition.Y - 200.0f,
+                camera.WorldPosition.Y + 200.0f,
+                NEAR_Z_WORLD_BOUNDARY,
+                FAR_Z_WORLD_BOUNDARY);
+#endif
         }
         /// @todo   Perspective!
         glMatrixMode(GL_MODELVIEW);
@@ -44,9 +55,10 @@ namespace GRAPHICS::OPEN_GL
         for (const auto& object_3D : scene.Objects)
         {
             glPushMatrix();
-            glLoadIdentity();
+            //glLoadIdentity();
             MATH::Matrix4x4f world_matrix = object_3D.WorldTransform();
-            glLoadMatrixf(world_matrix.Elements.ValuesInColumnMajorOrder().data());
+            //glLoadMatrixf(world_matrix.Elements.ValuesInColumnMajorOrder().data());
+            glMultMatrixf(world_matrix.Elements.ValuesInColumnMajorOrder().data());
             
             Render(object_3D);
 
@@ -69,6 +81,9 @@ namespace GRAPHICS::OPEN_GL
         glBegin(GL_TRIANGLES);
         for (const auto& triangle : object_3D.Triangles)
         {
+            MATH::Vector3f surface_normal = triangle.SurfaceNormal();
+            glNormal3f(surface_normal.X, surface_normal.Y, surface_normal.Z);
+
             for (std::size_t vertex_index = 0; vertex_index < triangle.Vertices.size(); ++vertex_index)
             {
                 const auto& vertex = triangle.Vertices[vertex_index];
