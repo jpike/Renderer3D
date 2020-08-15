@@ -1,4 +1,5 @@
 #include <gl/GL.h>
+#include <gl/GLU.h>
 #include "Graphics/OpenGL/OpenGLRenderer.h"
 
 namespace GRAPHICS::OPEN_GL
@@ -21,6 +22,14 @@ namespace GRAPHICS::OPEN_GL
                 camera.WorldPosition.Y + 200.0f,
                 -1.0f,
                 1.0f);
+        }
+        else if (ProjectionType::PERSPECTIVE == camera.Projection)
+        {
+            const MATH::Angle<float>::Degrees VERTICAL_FIELD_OF_VIEW_IN_DEGREES(90.0f);
+            const float ASPECT_RATIO_WIDTH_OVER_HEIGHT = 1.0f;
+            const float NEAR_Z_WORLD_BOUNDARY = 1.0f;
+            const float FAR_Z_WORLD_BOUNDARY = 500.0f;
+            gluPerspective(VERTICAL_FIELD_OF_VIEW_IN_DEGREES.Value, ASPECT_RATIO_WIDTH_OVER_HEIGHT, NEAR_Z_WORLD_BOUNDARY, FAR_Z_WORLD_BOUNDARY);
         }
         /// @todo   Perspective!
         glMatrixMode(GL_MODELVIEW);
@@ -60,9 +69,69 @@ namespace GRAPHICS::OPEN_GL
         glBegin(GL_TRIANGLES);
         for (const auto& triangle : object_3D.Triangles)
         {
-            glColor3f(1.0f, 1.0f, 1.0f);
-            for (const auto& vertex : triangle.Vertices)
+            for (std::size_t vertex_index = 0; vertex_index < triangle.Vertices.size(); ++vertex_index)
             {
+                const auto& vertex = triangle.Vertices[vertex_index];
+
+                switch (triangle.Material->Shading)
+                {
+                    case ShadingType::WIREFRAME:
+                    {
+                        glColor3f(
+                            triangle.Material->WireframeColor.Red,
+                            triangle.Material->WireframeColor.Green,
+                            triangle.Material->WireframeColor.Blue);
+                        break;
+                    }
+                    case ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION:
+                    {
+                        const Color& vertex_color = triangle.Material->VertexWireframeColors[vertex_index];
+                        glColor3f(
+                            vertex_color.Red,
+                            vertex_color.Green,
+                            vertex_color.Blue);
+                        break;
+                    }
+                    case ShadingType::FLAT:
+                    {
+                        glColor3f(
+                            triangle.Material->FaceColor.Red,
+                            triangle.Material->FaceColor.Green,
+                            triangle.Material->FaceColor.Blue);
+                        break;
+                    }
+                    case ShadingType::FACE_VERTEX_COLOR_INTERPOLATION:
+                    {
+                        const Color& vertex_color = triangle.Material->VertexFaceColors[vertex_index];
+                        glColor3f(
+                            vertex_color.Red,
+                            vertex_color.Green,
+                            vertex_color.Blue);
+                        break;
+                    }
+                    case ShadingType::GOURAUD:
+                    {
+                        const Color& vertex_color = triangle.Material->VertexColors[vertex_index];
+                        glColor3f(
+                            vertex_color.Red,
+                            vertex_color.Green,
+                            vertex_color.Blue);
+                        break;
+                    }
+                    case ShadingType::TEXTURED:
+                    {
+                        /// @todo
+                        glColor3f(1.0f, 1.0f, 1.0f);
+                        break;
+                    }
+                    case ShadingType::MATERIAL:
+                    {
+                        /// @todo
+                        glColor3f(0.5f, 0.5f, 0.5f);
+                        break;
+                    }
+                }
+
                 glVertex3f(vertex.X, vertex.Y, vertex.Z);
             }
         }

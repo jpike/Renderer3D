@@ -8,6 +8,8 @@
 #include <thread>
 #include <vector>
 #include <Windows.h>
+#include "Graphics/Cube.h"
+#include "Graphics/Modeling/WavefrontObjectModel.h"
 #include "Graphics/Object3D.h"
 #include "Graphics/OpenGL/GraphicsDevice.h"
 #include "Graphics/OpenGL/OpenGL.h"
@@ -32,8 +34,13 @@ enum class RendererType
 /// The window for the application.
 static std::unique_ptr<WINDOWING::Win32Window> g_window = nullptr;
 /// The scene currently being rendered.
+static std::size_t g_scene_index = 0;
 static GRAPHICS::Scene g_scene;
 static GRAPHICS::Camera g_camera;
+/// Materials by shading type.
+static std::array<std::shared_ptr<GRAPHICS::Material>, static_cast<std::size_t>(GRAPHICS::ShadingType::COUNT)> g_materials_by_shading_type;
+/// Current material index into the array above.
+static std::size_t g_current_material_index = 0;
 /// The type of renderer currently being used.
 static RendererType g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
 /// The software rasterizer.
@@ -44,7 +51,281 @@ static std::unique_ptr<GRAPHICS::RAY_TRACING::RayTracingAlgorithm> g_ray_tracer 
 /// The OpenGL renderer.
 static std::unique_ptr<GRAPHICS::OPEN_GL::OpenGLRenderer> g_open_gl_renderer = nullptr;
 std::shared_ptr<GRAPHICS::OPEN_GL::GraphicsDevice> g_open_gl_graphics_device = nullptr;
+/// The available lighting configurations.
+static std::vector< std::vector<GRAPHICS::Light> > g_light_configurations =
+{
+    // Full white ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+        },
+    },
+    // Half strength ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f)
+        },
+    },
+    // Pitch-black ambient lighting.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(0.0f, 0.0f, 0.0f, 1.0f)
+        },
+    },
+    // Red ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f)
+        },
+    },
+    // Green ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f)
+        },
+    },
+    // Blue ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(0.0f, 0.0f, 1.0f, 1.0f)
+        },
+    },
+    // White directional light going left.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f(-1.0f, 0.0f, 0.0f)
+        },
+    },
+    // White directional light going right.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f(1.0f, 0.0f, 0.0f)
+        },
+    },
+    // White directional light going down.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f(0.0f, -1.0f, 0.0f)
+        },
+    },
+    // White directional light going up.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f(0.0f, 1.0f, 0.0f)
+        },
+    },
+    // Red directional light at an angle.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f::Normalize(MATH::Vector3f(1.0f, 1.0f, 0.0f))
+        },
+    },
+    // Green directional light at an angle.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f::Normalize(MATH::Vector3f(0.0f, 1.0f, 1.0f))
+        },
+    },
+    // Blue directional light at an angle.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(0.0f, 0.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f::Normalize(MATH::Vector3f(1.0f, 0.0f, 1.0f))
+        },
+    },
+    // White point light at center.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(0.0f, 0.0f, 0.0f)
+        },
+    },
+    // Red-green light at left.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 0.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(-50.0f, 0.0f, 0.0f)
+        },
+    },
+    // Green-blue light at right.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(0.0f, 1.0f, 1.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(50.0f, 0.0f, 0.0f)
+        },
+    },
+    // Blue-red light at top.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(1.0f, 0.0f, 1.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(0.0f, 50.0f, 0.0f)
+        },
+    },
+    // Green-blue light at bottom.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(0.0f, 1.0f, 1.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(0.0f, -50.0f, 0.0f)
+        },
+    },
+};
+/// Current light index into array above.
+static std::size_t g_current_light_index = 0;
 
+GRAPHICS::Scene CreateScene(const std::size_t scene_index)
+{
+    switch (scene_index)
+    {
+        case 0:
+        {
+            // BASIC WHITE TRIANGLE.
+            std::shared_ptr<GRAPHICS::Material> material = std::make_shared<GRAPHICS::Material>();
+            material->Shading = GRAPHICS::ShadingType::FLAT;
+            material->FaceColor = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f);
+            GRAPHICS::Object3D triangle_object;
+            triangle_object.Triangles =
+            {
+                GRAPHICS::Triangle(
+                    material,
+                    {
+                        MATH::Vector3f(0.0f, 200.0f, 0.0f),
+                        MATH::Vector3f(-200.0f, -200.0f, 0.0f),
+                        MATH::Vector3f(200.0f, -200.0f, 0.0f)
+                    })
+            };
+            GRAPHICS::Scene scene;
+            scene.Objects.push_back(triangle_object);
+            return scene;
+        }
+        case 1:
+        {
+            // OLDER BASIC TRIANGLE.
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            GRAPHICS::Triangle triangle = GRAPHICS::Triangle::CreateEquilateral(material);
+            GRAPHICS::Object3D larger_triangle;
+            larger_triangle.Triangles = { triangle };
+            constexpr float LARGER_TRIANGLE_SCALE = 50.0f;
+            larger_triangle.Scale = MATH::Vector3f(LARGER_TRIANGLE_SCALE, LARGER_TRIANGLE_SCALE, 1.0f);
+            larger_triangle.WorldPosition = MATH::Vector3f(0.0f, 0.0f, 0.0f);
+            GRAPHICS::Scene scene;
+            scene.Objects.push_back(larger_triangle);
+            return scene;
+        }
+        case 2:
+        {
+            // MANY SMALL TRIANGLES.
+            constexpr std::size_t SMALL_TRIANGLE_COUNT = 300;
+            std::random_device random_number_generator;
+            GRAPHICS::Scene scene;
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            GRAPHICS::Triangle triangle = GRAPHICS::Triangle::CreateEquilateral(material);
+            while (scene.Objects.size() < SMALL_TRIANGLE_COUNT)
+            {
+                GRAPHICS::Object3D current_object_3D;
+                current_object_3D.Triangles = { triangle };
+                constexpr float OBJECT_SCALE = 30.0f;
+                current_object_3D.Scale = MATH::Vector3f(OBJECT_SCALE, OBJECT_SCALE, OBJECT_SCALE);
+                float x_position = static_cast<float>(random_number_generator() % 150) - 75.0f;
+                float y_position = static_cast<float>(random_number_generator() % 150) - 75.0f;
+                current_object_3D.WorldPosition = MATH::Vector3f(x_position, y_position, -100.0f);
+                scene.Objects.push_back(current_object_3D);
+            }
+            return scene;
+        }
+        case 3:
+        {
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            GRAPHICS::Object3D cube = GRAPHICS::Cube::Create(material);
+            cube.Scale = MATH::Vector3f(10.0f, 10.0f, 10.0f);
+            cube.WorldPosition = MATH::Vector3f(0.0f, 0.0f, 0.0f);
+
+            GRAPHICS::Scene scene;
+            scene.Objects.push_back(cube);
+            return scene;
+        }
+        case 4:
+        {
+            GRAPHICS::Scene scene;
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            std::optional<GRAPHICS::Object3D> cube_from_file = GRAPHICS::MODELING::WavefrontObjectModel::Load("../assets/default_cube.obj");
+            if (cube_from_file)
+            {
+                /// @todo   Need to support proper material loading.
+#if 1
+                for (auto& loaded_triangle : cube_from_file->Triangles)
+                {
+                    loaded_triangle.Material = material;
+                }
+#endif
+                scene.Objects.push_back(*cube_from_file);
+            }
+
+            return scene;
+        }
+        default:
+            return g_scene;
+    }
+}
 
 /// The main window callback procedure for processing messages sent to the main application window.
 /// @param[in]  window - Handle to the window.
@@ -150,6 +431,57 @@ LRESULT CALLBACK MainWindowCallback(
                     g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(), g_camera.WorldPosition);
                     break;
                 }
+                case 0x30: // 0
+                {
+                    constexpr std::size_t MAX_SCENE_COUNT = 5;
+                    ++g_scene_index;
+                    g_scene_index = g_scene_index % MAX_SCENE_COUNT;
+                    OutputDebugString(("\nScene index: " + std::to_string(g_scene_index)).c_str());
+                    g_scene = CreateScene(g_scene_index);
+                    break;
+                }
+                case 0x50: // P
+                {
+                    if (GRAPHICS::ProjectionType::ORTHOGRAPHIC == g_camera.Projection)
+                    {
+                        g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
+                        OutputDebugString("\nPerspective projection");
+                    }
+                    else
+                    {
+                        g_camera.Projection = GRAPHICS::ProjectionType::ORTHOGRAPHIC;
+                        OutputDebugString("\nOrthographic projection");
+                    }
+                    break;
+                }
+                case 0x4D: // M
+                {
+                    // SWITCH TO THE NEXT MATERIAL FOR ALL OBJECTS.
+                    ++g_current_material_index;
+                    g_current_material_index = g_current_material_index % static_cast<std::size_t>(GRAPHICS::ShadingType::COUNT);
+
+                    OutputDebugString(("\nMaterial index: " + std::to_string(g_current_material_index)).c_str());
+
+                    const std::shared_ptr<GRAPHICS::Material>& current_material = g_materials_by_shading_type.at(g_current_material_index);
+                    for (auto& object_3D : g_scene.Objects)
+                    {
+                        for (auto& triangle : object_3D.Triangles)
+                        {
+                            triangle.Material = current_material;
+                        }
+                    }
+                    break;
+                }
+                case 0x4C: // L
+                {
+                    // SWITCH TO THE NEXT LIGHTING CONFIGURATION.
+                    ++g_current_light_index;
+                    g_current_light_index = g_current_light_index % g_light_configurations.size();
+                    g_scene.PointLights = g_light_configurations[g_current_light_index];
+
+                    std::string light_index_string = "\nLight index: " + std::to_string(g_current_light_index);
+                    OutputDebugString(light_index_string.c_str());
+                }
 
                 /// @todo
                 case 0x31: // 1
@@ -171,6 +503,7 @@ LRESULT CALLBACK MainWindowCallback(
                         //g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
 
                         g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
+                        OutputDebugString("\nSoftware rasterizer");
                     }
                     break;
                 }
@@ -187,6 +520,7 @@ LRESULT CALLBACK MainWindowCallback(
                         //g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
 
                         g_current_renderer_type = RendererType::SOFTWARE_RAY_TRACER;
+                        OutputDebugString("\nSoftware ray tracer");
                     }
                     break;
                 }
@@ -231,6 +565,7 @@ LRESULT CALLBACK MainWindowCallback(
                         glViewport(0, 0, 400, 400);
 
                         g_current_renderer_type = RendererType::OPEN_GL;
+                        OutputDebugString("\nOpenGL");
                     }
                     break;
                 }
@@ -238,6 +573,11 @@ LRESULT CALLBACK MainWindowCallback(
                     virtual_key_code;
                     break;
             }
+            std::string camera_position = "\nCamera Position: ";
+            camera_position += std::to_string(g_camera.WorldPosition.X) + ",";
+            camera_position += std::to_string(g_camera.WorldPosition.Y) + ",";
+            camera_position += std::to_string(g_camera.WorldPosition.Z) + "\n";
+            OutputDebugString(camera_position.c_str());
 #endif
 
             break;
@@ -322,27 +662,131 @@ int CALLBACK WinMain(
         g_software_render_target = std::make_unique<GRAPHICS::RenderTarget>(400, 400, GRAPHICS::ColorFormat::ARGB);
     }
     
-    g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
     g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
 
-    // CREATE EXAMPLE OBJECTS.
-    std::shared_ptr<GRAPHICS::Material> material = std::make_shared<GRAPHICS::Material>();
-    material->Shading = GRAPHICS::ShadingType::FLAT;
-    material->FaceColor = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f);
-    GRAPHICS::Object3D triangle_object;
-    triangle_object.Triangles =
+    // Using OpenGL as default now for testing.
+    bool open_gl_already_being_used = (RendererType::OPEN_GL == g_current_renderer_type);
+    if (!open_gl_already_being_used)
     {
-        GRAPHICS::Triangle(
-            material,
+        if (!g_open_gl_renderer)
+        {
+            g_open_gl_renderer = std::make_unique<GRAPHICS::OPEN_GL::OpenGLRenderer>();
+
+            // GET THE DEVICE CONTEXT OF THE WINDOW.
+            HDC device_context = GetDC(g_window->WindowHandle);
+            bool device_context_retrieved = (NULL != device_context);
+            if (!device_context_retrieved)
             {
-                MATH::Vector3f(0.0f, 200.0f, 0.0f),
-                MATH::Vector3f(-200.0f, -200.0f, 0.0f),
-                MATH::Vector3f(200.0f, -200.0f, 0.0f)
-            })
+                OutputDebugString("Failed to get window device context.");
+                return EXIT_FAILURE;
+            }
+
+            // INITIALIZE OPEN GL.
+            bool open_gl_initialized = GRAPHICS::OPEN_GL::Initialize(device_context);
+            if (!open_gl_initialized)
+            {
+                OutputDebugString("Failed to initialize OpenGL.");
+                return EXIT_FAILURE;
+            }
+
+            // CREATE THE GRAPHICS DEVICE.
+            g_open_gl_graphics_device = GRAPHICS::OPEN_GL::GraphicsDevice::Create(device_context);
+            bool graphics_device_created = (nullptr != g_open_gl_graphics_device);
+            if (!graphics_device_created)
+            {
+                OutputDebugString("Failed to create the graphics device.");
+                return EXIT_FAILURE;
+            }
+        }
+
+        /// @todo   Where to put these?
+        /// @todo   Centralize screen dimensions!
+        glViewport(0, 0, 400, 400);
+
+        g_current_renderer_type = RendererType::OPEN_GL;
+    }
+
+    g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
+
+    // LOAD A TEXTURE FOR TESTING.
+    std::shared_ptr<GRAPHICS::Texture> texture = GRAPHICS::Texture::Load("../assets/test_texture1.bmp");
+    if (!texture)
+    {
+        OutputDebugString("Failed to load test texture.");
+        return EXIT_FAILURE;
+    }
+
+    // DEFINE A VARIETY OF MATERIALS.
+    // These can't be initialized statically since some of the color constants are also static,
+    // and initialization order isn't clearly defined.
+    g_materials_by_shading_type =
+    {
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::WIREFRAME,
+            .WireframeColor = GRAPHICS::Color::GREEN
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION,
+            .VertexWireframeColors =
+            {
+                GRAPHICS::Color::RED,
+                GRAPHICS::Color::GREEN,
+                GRAPHICS::Color::BLUE,
+            }
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::FLAT,
+            .FaceColor = GRAPHICS::Color::BLUE
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::FACE_VERTEX_COLOR_INTERPOLATION,
+            .VertexFaceColors =
+            {
+                GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f),
+                GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f),
+                GRAPHICS::Color(0.0f, 0.0f, 1.0f, 1.0f),
+            }
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::GOURAUD,
+            .VertexColors =
+            {
+                // Basic grayscale.
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+            },
+            .SpecularPower = 20.0f
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::TEXTURED,
+            .VertexColors =
+            {
+                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            },
+            .Texture = texture,
+            .VertexTextureCoordinates =
+            {
+                MATH::Vector2f(0.0f, 0.0f),
+                MATH::Vector2f(1.0f, 0.0f),
+                MATH::Vector2f(0.0f, 1.0f)
+            }
+        })
     };
-    g_scene.Objects.push_back(triangle_object);
+
+    // CREATE EXAMPLE OBJECTS.
+    g_scene = CreateScene(g_scene_index);
 
     // RUN A MESSAGE LOOP.
+    float object_rotation_angle_in_radians = 0.0f;
     constexpr float TARGET_FRAMES_PER_SECOND = 60.0f;
     constexpr std::chrono::duration<float, std::chrono::seconds::period> TARGET_SECONDS_PER_FRAME(1.0f / TARGET_FRAMES_PER_SECOND);
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -386,13 +830,25 @@ int CALLBACK WinMain(
             DispatchMessage(&message);
         }
 
+        // ROTATE ANY OBJECT IN THE SCENE.
+        auto current_time = std::chrono::high_resolution_clock::now();
+        auto total_elapsed_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - start_time).count();
+        object_rotation_angle_in_radians = 0.5f * total_elapsed_time;
+        for (auto& object_3D : g_scene.Objects)
+        {
+            object_3D;
+            object_3D.RotationInRadians.X = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            object_3D.RotationInRadians.Y = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            object_3D.RotationInRadians.Z = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+        }
+
         // RENDER THE SCENE BASED ON THE CURRENT RENDERER.
         switch (g_current_renderer_type)
         {
             case RendererType::SOFTWARE_RASTERIZER:
             {
                 // RENDER THE SCENE.
-                g_scene.BackgroundColor = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f);
+                //g_scene.BackgroundColor = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f);
                 g_software_rasterizer->Render(g_scene, g_camera, *g_software_render_target);
 
                 // DISPLAY THE RENDERED OBJECTS IN THE WINDOW.
@@ -402,7 +858,7 @@ int CALLBACK WinMain(
             }
             case RendererType::SOFTWARE_RAY_TRACER:
             {
-                g_scene.BackgroundColor = GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f);
+                //g_scene.BackgroundColor = GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f);
                 g_camera.ViewingPlane.Width = static_cast<float>(SCREEN_WIDTH_IN_PIXELS);
                 g_camera.ViewingPlane.Height = static_cast<float>(SCREEN_HEIGHT_IN_PIXELS);
                 g_ray_tracer->Render(g_scene, g_camera, *g_software_render_target);
@@ -414,7 +870,7 @@ int CALLBACK WinMain(
             }
             case RendererType::OPEN_GL:
             {
-                g_scene.BackgroundColor = GRAPHICS::Color(0.0f, 0.0f, 1.0f, 1.0f);
+                //g_scene.BackgroundColor = GRAPHICS::Color(0.0f, 0.0f, 1.0f, 1.0f);
                 g_open_gl_renderer->Render(g_scene, g_camera);
 
                 glFlush();
@@ -431,7 +887,7 @@ int CALLBACK WinMain(
             }
         }
 
-#define DISPLAY_FRAME_TIMES 1
+#define DISPLAY_FRAME_TIMES 0
 #if DISPLAY_FRAME_TIMES
         // DISPLAY STATISICS ABOUT FRAME TIMING.
         auto frame_end_time = std::chrono::high_resolution_clock::now();

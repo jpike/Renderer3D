@@ -79,7 +79,7 @@ namespace GRAPHICS
         //const float NEAR_Z_WORLD_BOUNDARY = camera.WorldPosition.Z - 0.5f;
         //const float FAR_Z_WORLD_BOUNDARY = camera.WorldPosition.Z - 2.5f;
         const float NEAR_Z_WORLD_BOUNDARY = camera.WorldPosition.Z - 1.0f;
-        const float FAR_Z_WORLD_BOUNDARY = camera.WorldPosition.Z - 3.0f; //- 500.0f;
+        const float FAR_Z_WORLD_BOUNDARY = camera.WorldPosition.Z - 500.0f;
         MATH::Matrix4x4f orthographic_projection_transform = Camera::OrthographicProjection(
             LEFT_X_WORLD_BOUNDARY,
             RIGHT_X_WORLD_BOUNDARY,
