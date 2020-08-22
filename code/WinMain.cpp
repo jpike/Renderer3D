@@ -713,6 +713,7 @@ int CALLBACK WinMain(
     }
 
     g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
+    g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
 
     // LOAD A TEXTURE FOR TESTING.
     std::shared_ptr<GRAPHICS::Texture> texture = GRAPHICS::Texture::Load("../assets/test_texture1.bmp");
@@ -807,6 +808,9 @@ int CALLBACK WinMain(
     };
 
     // CREATE EXAMPLE OBJECTS.
+    g_scene_index = 3;
+    g_current_material_index = 3;
+    g_current_light_index = 0;
     g_scene = CreateScene(g_scene_index);
 
     // RUN A MESSAGE LOOP.
@@ -863,9 +867,9 @@ int CALLBACK WinMain(
             object_3D;
 #define ROTATE_OBJECTS 1
 #if ROTATE_OBJECTS
-            //object_3D.RotationInRadians.X = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
-            //object_3D.RotationInRadians.Y = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
-            //object_3D.RotationInRadians.Z = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            object_3D.RotationInRadians.X = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            object_3D.RotationInRadians.Y = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            object_3D.RotationInRadians.Z = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
 #endif
         }
 
