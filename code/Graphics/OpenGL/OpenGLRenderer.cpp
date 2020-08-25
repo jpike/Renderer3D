@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <gl/GL.h>
 #include <gl/GLU.h>
 #include "Graphics/OpenGL/OpenGLRenderer.h"
@@ -9,6 +10,67 @@ namespace GRAPHICS::OPEN_GL
     /// @param[in]  camera - The camera to use to view the scene.
     void OpenGLRenderer::Render(const Scene& scene, const Camera& camera) const
     {
+        glEnable(GL_DEPTH_TEST);
+
+        ClearScreen(scene.BackgroundColor);
+
+        // SET LIGHTING IF APPROPRIATE.
+        /// @todo   Better way to control lighting than presence/absence of light?
+        bool lighting_enabled = !scene.PointLights.empty();
+        if (lighting_enabled)
+        {
+            // ENABLE LIGHTING.
+            glEnable(GL_LIGHTING);
+
+            // SET EACH LIGHT.
+            // While lights only up to GL_LIGHT7 are explicitly defined,
+            // more lights are actually supported, and the greater lights
+            // can be specified by simple addition (http://docs.gl/gl2/glLight).
+            GLenum light_count = static_cast<GLenum>(scene.PointLights.size());
+            GLenum max_light_index = std::min<GLenum>(light_count, GL_MAX_LIGHTS);
+            for (GLenum light_index = 0; light_index < max_light_index; ++light_index)
+            {
+                // ENABLE THE CURRENT LIGHT.
+                GLenum light_id = GL_LIGHT0 + light_index;
+                glEnable(light_id);
+                const float LIGHT_ATTENUATION = 2.0f;
+                glLightfv(light_id, GL_QUADRATIC_ATTENUATION, &LIGHT_ATTENUATION);
+
+                // SET PROPERTIES RELATED TO THE CURRENT TYPE OF LIGHT.
+                const Light& current_light = scene.PointLights[light_index];
+                float light_color[] = { current_light.Color.Red, current_light.Color.Green, current_light.Color.Blue, current_light.Color.Alpha };
+                const float NO_LIGHT_COLOR[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+                switch (current_light.Type)
+                {
+                    case LightType::AMBIENT:
+                    {
+                        glLightfv(light_id, GL_AMBIENT, light_color);
+                        break;
+                    }
+                    case LightType::DIRECTIONAL:
+                    {
+                        glLightfv(light_id, GL_DIFFUSE, light_color);
+                        glLightfv(light_id, GL_SPECULAR, light_color);
+                        float light_direction[] = { current_light.DirectionalLightDirection.X, current_light.DirectionalLightDirection.Y, current_light.DirectionalLightDirection.Z };
+                        glLightfv(light_id, GL_SPOT_DIRECTION, light_direction);
+                        break;
+                    }
+                    case LightType::POINT:
+                    {
+                        glLightfv(light_id, GL_DIFFUSE, light_color);
+                        glLightfv(light_id, GL_SPECULAR, light_color);
+                        float light_position[] = { current_light.PointLightWorldPosition.X, current_light.PointLightWorldPosition.Y, current_light.PointLightWorldPosition.Z, 1.0f };
+                        glLightfv(light_id, GL_POSITION, light_position);
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            glDisable(GL_LIGHTING);
+        }
+
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
 
@@ -16,7 +78,7 @@ namespace GRAPHICS::OPEN_GL
         {
             /// @todo   Centralize screen dimensions!
             glOrtho(
-                camera.WorldPosition.X - 200.0f, 
+                camera.WorldPosition.X - 200.0f,
                 camera.WorldPosition.X + 200.0f,
                 camera.WorldPosition.Y - 200.0f,
                 camera.WorldPosition.Y + 200.0f,
@@ -49,8 +111,6 @@ namespace GRAPHICS::OPEN_GL
         MATH::Matrix4x4f view_matrix = camera.ViewTransform();
         glLoadMatrixf(view_matrix.Elements.ValuesInColumnMajorOrder().data());
 
-        ClearScreen(scene.BackgroundColor);
-
         // RENDER EACH OBJECT IN THE SCENE.
         for (const auto& object_3D : scene.Objects)
         {
@@ -71,23 +131,64 @@ namespace GRAPHICS::OPEN_GL
     void OpenGLRenderer::ClearScreen(const Color& color) const
     {
         glClearColor(color.Red, color.Green, color.Blue, color.Alpha);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 
     /// Renders the specified object.
     /// @param[in]  object_3D - The 3D object to render.
     void OpenGLRenderer::Render(const Object3D& object_3D) const
     {
-        glBegin(GL_TRIANGLES);
         for (const auto& triangle : object_3D.Triangles)
         {
+            // START RENDERING THE APPROPRIATE TYPE OF PRIMITIVE.
+            bool is_wireframe = (
+                ShadingType::WIREFRAME == triangle.Material->Shading ||
+                ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION == triangle.Material->Shading);
+            if (is_wireframe)
+            {
+                // RENDER LINES BETWEEN EACH VERTEX.
+                glBegin(GL_LINE_LOOP);
+            }
+            else
+            {
+                // RENDER NORMAL TRIANGLES.
+                glBegin(GL_TRIANGLES);
+            }
+
+            // SET THE APPROPRIATE TYPE OF SHADING.
+            bool is_flat = (
+                ShadingType::WIREFRAME == triangle.Material->Shading ||
+                ShadingType::FLAT == triangle.Material->Shading);
+            if (is_flat)
+            {
+                glShadeModel(GL_FLAT);
+            }
+            else
+            {
+                glShadeModel(GL_SMOOTH);
+            }
+
+            // SET THE SURFACE NORMAL.
             MATH::Vector3f surface_normal = triangle.SurfaceNormal();
             glNormal3f(surface_normal.X, surface_normal.Y, surface_normal.Z);
 
+            // RENDER EACH VERTEX.
             for (std::size_t vertex_index = 0; vertex_index < triangle.Vertices.size(); ++vertex_index)
             {
-                const auto& vertex = triangle.Vertices[vertex_index];
+#if TODO_THIS_CAUSES_TOO_MUCH_INTERFERENCE_HARD_TO_MANAGE_STATE
+                // CLEAR ANY PREVIOUSLY SET MATERIAL PROPERTIES TO AVOID INTERFERENCE.
+                // They're reset to defaults (http://docs.gl/gl2/glMaterial) to allow other lighting to continue.
+                const float NO_MATERIAL_COLOR[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+                const float DEFAULT_AMBIENT_MATERIAL_COLOR[] = { 0.2f, 0.2f, 0.2f, 1.0f };
+                const float DEFAULT_DIFFUSE_MATERIAL_COLOR[] = { 0.8f, 0.8f, 0.8f, 1.0f };
+                glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, DEFAULT_AMBIENT_MATERIAL_COLOR);
+                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, DEFAULT_DIFFUSE_MATERIAL_COLOR);
+                /// @todo   Clear shininess too?
+                glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, NO_MATERIAL_COLOR);
+                glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, NO_MATERIAL_COLOR);
+#endif
 
+                // SPECIFY THE VERTEX COLOR.
                 switch (triangle.Material->Shading)
                 {
                     case ShadingType::WIREFRAME:
@@ -141,15 +242,34 @@ namespace GRAPHICS::OPEN_GL
                     }
                     case ShadingType::MATERIAL:
                     {
-                        /// @todo
+#if TODO_THIS_CAUSES_TOO_MUCH_INTERFERENCE_HARD_TO_MANAGE_STATE
+                        float ambient_color[] = { triangle.Material->AmbientColor.Red, triangle.Material->AmbientColor.Green, triangle.Material->AmbientColor.Blue, triangle.Material->AmbientColor.Alpha };
+                        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient_color);
+
+                        float diffuse_color[] = { triangle.Material->DiffuseColor.Red, triangle.Material->DiffuseColor.Green, triangle.Material->DiffuseColor.Blue, triangle.Material->DiffuseColor.Alpha };
+                        glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse_color);
+
+                        float specular_color[] = { triangle.Material->SpecularColor.Red, triangle.Material->SpecularColor.Green, triangle.Material->SpecularColor.Blue, triangle.Material->SpecularColor.Alpha };
+                        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular_color);
+
+                        glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, &triangle.Material->SpecularPower);
+
+                        float emissive_color[] = { triangle.Material->EmissiveColor.Red, triangle.Material->EmissiveColor.Green, triangle.Material->EmissiveColor.Blue, triangle.Material->EmissiveColor.Alpha };
+                        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emissive_color);
+#else
                         glColor3f(0.5f, 0.5f, 0.5f);
+#endif
                         break;
                     }
                 }
 
+                // SPECIFY THE VERTEX POSITION.
+                const auto& vertex = triangle.Vertices[vertex_index];
                 glVertex3f(vertex.X, vertex.Y, vertex.Z);
             }
+
+            // FINISH RENDERING THE TRIANGLE.
+            glEnd();
         }
-        glEnd();
     }
 }

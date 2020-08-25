@@ -487,6 +487,7 @@ LRESULT CALLBACK MainWindowCallback(
 
                     std::string light_index_string = "\nLight index: " + std::to_string(g_current_light_index);
                     OutputDebugString(light_index_string.c_str());
+                    break;
                 }
 
                 /// @todo
@@ -790,20 +791,8 @@ int CALLBACK WinMain(
         std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
         {
             /// @todo   Make this get values directly from the "material".
-            .Shading = GRAPHICS::ShadingType::TEXTURED,
-            .VertexColors =
-            {
-                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
-                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
-                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
-            },
-            .Texture = texture,
-            .VertexTextureCoordinates =
-            {
-                MATH::Vector2f(0.0f, 0.0f),
-                MATH::Vector2f(1.0f, 0.0f),
-                MATH::Vector2f(0.0f, 1.0f)
-            }
+            .Shading = GRAPHICS::ShadingType::MATERIAL,
+            .DiffuseColor = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f),
         })
     };
 
