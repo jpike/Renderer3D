@@ -792,7 +792,8 @@ int CALLBACK WinMain(
         {
             /// @todo   Make this get values directly from the "material".
             .Shading = GRAPHICS::ShadingType::MATERIAL,
-            .DiffuseColor = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f),
+            .AmbientColor = GRAPHICS::Color(0.2f, 0.2f, 0.2f, 1.0f),
+            .DiffuseColor = GRAPHICS::Color(0.8f, 0.8f, 0.8f, 1.0f),
         })
     };
 

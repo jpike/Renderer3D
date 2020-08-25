@@ -140,6 +140,34 @@ namespace GRAPHICS::OPEN_GL
     {
         for (const auto& triangle : object_3D.Triangles)
         {
+            // ALLOCATE A TEXTURE IF APPLICABLE.
+            // Must be done outside of glBegin()/glEnd() (http://docs.gl/gl2/glGenTextures).
+            GLuint texture = 0;
+            bool is_textured = (ShadingType::TEXTURED == triangle.Material->Shading);
+            if (is_textured)
+            {
+                glEnable(GL_TEXTURE_2D);
+
+                glGenTextures(1, &texture);
+                glBindTexture(GL_TEXTURE_2D, texture);
+
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+                glTexImage2D(
+                    GL_TEXTURE_2D,
+                    0, // level of detail
+                    GL_RGBA, // this is the only thing we currently support
+                    triangle.Material->Texture->Bitmap.GetWidthInPixels(),
+                    triangle.Material->Texture->Bitmap.GetHeightInPixels(),
+                    0, // no border
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE, // one byte per color component
+                    triangle.Material->Texture->Bitmap.GetRawData());
+            }
+
             // START RENDERING THE APPROPRIATE TYPE OF PRIMITIVE.
             bool is_wireframe = (
                 ShadingType::WIREFRAME == triangle.Material->Shading ||
@@ -236,8 +264,9 @@ namespace GRAPHICS::OPEN_GL
                     }
                     case ShadingType::TEXTURED:
                     {
-                        /// @todo
-                        glColor3f(1.0f, 1.0f, 1.0f);
+                        glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
+                        const MATH::Vector2f& current_vertex_texture_coordinates = triangle.Material->VertexTextureCoordinates[vertex_index];
+                        glTexCoord2f(current_vertex_texture_coordinates.X, current_vertex_texture_coordinates.Y);
                         break;
                     }
                     case ShadingType::MATERIAL:
@@ -270,6 +299,12 @@ namespace GRAPHICS::OPEN_GL
 
             // FINISH RENDERING THE TRIANGLE.
             glEnd();
+
+            if (is_textured)
+            {
+                glDeleteTextures(1, &texture);
+                glDisable(GL_TEXTURE_2D);
+            }
         }
     }
 }
