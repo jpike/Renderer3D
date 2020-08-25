@@ -13,6 +13,45 @@ namespace RAY_TRACING
     /// @param[in,out]  render_target - The target to render to.
     void RayTracingAlgorithm::Render(const Scene& scene, const Camera& camera, GRAPHICS::RenderTarget& render_target)
     {
+        // TRANSFORM OBJECTS IN THE SCENE INTO WORLD SPACE.
+        Scene scene_with_world_space_objects;
+        scene_with_world_space_objects.BackgroundColor = scene.BackgroundColor;
+        scene_with_world_space_objects.PointLights = scene.PointLights;
+        for (const Object3D& untransformed_object : scene.Objects)
+        {
+            // INITIALIZE THE TRANSFORMED VERSION OF THE OBJECT.
+            Object3D transformed_object;
+            transformed_object.Scale = untransformed_object.Scale;
+            transformed_object.WorldPosition = untransformed_object.WorldPosition;
+            transformed_object.RotationInRadians = untransformed_object.RotationInRadians;
+
+            // TRANSFORM ALL TRIANGLES IN THE OBJECT.
+            MATH::Matrix4x4f world_transform = untransformed_object.WorldTransform();
+            for (const Triangle& untransformed_triangle : untransformed_object.Triangles)
+            {
+                // INITIALIZE THE TRANSFORMED VERSION OF THE TRIANGLE.
+                Triangle transformed_triangle;
+                transformed_triangle.Material = untransformed_triangle.Material;
+
+                // TRANSFORM EACH VERTEX OF THE TRIANGLE.
+                for (std::size_t vertex_index = 0; vertex_index < untransformed_triangle.Vertices.size(); ++vertex_index)
+                {
+                    const MATH::Vector3f& untransformed_vertex = untransformed_triangle.Vertices[vertex_index];
+                    MATH::Vector4f homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(untransformed_vertex);
+                    MATH::Vector4f transformed_vertex = world_transform * homogeneous_vertex;
+                    transformed_triangle.Vertices[vertex_index] = MATH::Vector3f(transformed_vertex.X, transformed_vertex.Y, transformed_vertex.Z);
+                }
+
+                // STORE THE TRANSFORMED TRIANGLE.
+                transformed_object.Triangles.push_back(transformed_triangle);
+            }
+
+            // STORE THE TRANSFORMED OBJECT.
+            scene_with_world_space_objects.Objects.push_back(transformed_object);
+        }
+
+        /// @todo   A lot of this ray tracing stuff still isn't working correctly.  Needs more updates!
+
         // RENDER EACH ROW OF PIXELS.
         unsigned int render_target_height_in_pixels = render_target.GetHeightInPixels();
         for (unsigned int y = 0; y < render_target_height_in_pixels; ++y)
@@ -26,13 +65,13 @@ namespace RAY_TRACING
                 Ray ray = camera.ViewingRay(pixel_coordinates, render_target);
 
                 // FIND THE CLOSEST OBJECT IN THE SCENE THAT THE RAY INTERSECTS.
-                std::optional<RayObjectIntersection> closest_intersection = ComputeClosestIntersection(scene, ray);
+                std::optional<RayObjectIntersection> closest_intersection = ComputeClosestIntersection(scene_with_world_space_objects, ray);
 
                 // COLOR THE CURRENT PIXEL.
                 if (closest_intersection)
                 {
                     // COMPUTE THE CURRENT PIXEL'S COLOR.
-                    Color color = ComputeColor(scene, *closest_intersection, ReflectionCount);
+                    Color color = ComputeColor(scene_with_world_space_objects, *closest_intersection, ReflectionCount);
 
                     /// @todo   Fix color hack.
                     if (ShadingType::FLAT == closest_intersection->Triangle->Material->Shading)
@@ -45,7 +84,7 @@ namespace RAY_TRACING
                 else
                 {
                     // FILL THE PIXEL WITH THE BACKGROUND COLOR.
-                    render_target.WritePixel(x, y, scene.BackgroundColor);
+                    render_target.WritePixel(x, y, scene_with_world_space_objects.BackgroundColor);
                 }
             }
         }
