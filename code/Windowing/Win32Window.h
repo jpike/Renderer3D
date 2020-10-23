@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 #include <Windows.h>
-#include "Graphics/RenderTarget.h"
+#include "Graphics/Bitmap.h"
 
 /// Holds code for graphical user interface windows.
 namespace WINDOWING
@@ -21,7 +21,7 @@ namespace WINDOWING
         explicit Win32Window(const HWND window_handle);
 
         // RENDERING.
-        void Display(const GRAPHICS::RenderTarget& render_target);
+        void Display(const GRAPHICS::Bitmap& bitmap);
 
         // MEMBER VARIABLES.
         /// The handle to window.

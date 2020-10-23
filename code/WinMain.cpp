@@ -45,7 +45,7 @@ static std::size_t g_current_material_index = 0;
 static RendererType g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
 /// The software rasterizer.
 static std::unique_ptr<GRAPHICS::Renderer> g_software_rasterizer = nullptr;
-static std::unique_ptr<GRAPHICS::RenderTarget> g_software_render_target = nullptr;
+static std::unique_ptr<GRAPHICS::Bitmap> g_software_render_target = nullptr;
 /// The ray tracer.
 static std::unique_ptr<GRAPHICS::RAY_TRACING::RayTracingAlgorithm> g_ray_tracer = nullptr;
 /// The OpenGL renderer.
@@ -504,7 +504,7 @@ LRESULT CALLBACK MainWindowCallback(
                         if (!g_software_render_target)
                         {
                             /// @todo   Centralize screen dimensions.
-                            g_software_render_target = std::make_unique<GRAPHICS::RenderTarget>(400, 400, GRAPHICS::ColorFormat::ARGB);
+                            g_software_render_target = std::make_unique<GRAPHICS::Bitmap>(400, 400, GRAPHICS::ColorFormat::ARGB);
                         }
 
                         //g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
@@ -666,11 +666,12 @@ int CALLBACK WinMain(
     if (!g_software_render_target)
     {
         /// @todo   Centralize screen dimensions.
-        g_software_render_target = std::make_unique<GRAPHICS::RenderTarget>(400, 400, GRAPHICS::ColorFormat::ARGB);
+        g_software_render_target = std::make_unique<GRAPHICS::Bitmap>(400, 400, GRAPHICS::ColorFormat::ARGB);
     }
     
     g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
 
+#if OPEN_GL_DEFAULT
     // Using OpenGL as default now for testing.
     bool open_gl_already_being_used = (RendererType::OPEN_GL == g_current_renderer_type);
     if (!open_gl_already_being_used)
@@ -712,12 +713,13 @@ int CALLBACK WinMain(
 
         g_current_renderer_type = RendererType::OPEN_GL;
     }
+#endif
 
     g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
     g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
 
     // LOAD A TEXTURE FOR TESTING.
-    std::shared_ptr<GRAPHICS::Texture> texture = GRAPHICS::Texture::Load("../assets/test_texture1.bmp");
+    std::shared_ptr<GRAPHICS::Bitmap> texture = GRAPHICS::Bitmap::Load("../assets/test_texture1.bmp");
     if (!texture)
     {
         OutputDebugString("Failed to load test texture.");

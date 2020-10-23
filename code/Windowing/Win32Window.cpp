@@ -77,9 +77,9 @@ namespace WINDOWING
         WindowHandle(window_handle)
     {}
 
-    /// Displays the provided render target in the window.
-    /// @param[in]  render_target - The render target to display.
-    void Win32Window::Display(const GRAPHICS::RenderTarget& render_target)
+    /// Displays the provided bitmap in the window.
+    /// @param[in]  bitmap - The bitmap to display.
+    void Win32Window::Display(const GRAPHICS::Bitmap& bitmap)
     {
         // GET THE DEVICE CONTEXT.
         HDC device_context = GetDC(WindowHandle);
@@ -93,12 +93,12 @@ namespace WINDOWING
         // POPULATE THE BITMAP INFO DESCRIBING THE RENDER TARGET.
         BITMAPINFO bitmap_info = {};
         bitmap_info.bmiHeader.biSize = sizeof(bitmap_info.bmiHeader);
-        int render_target_width = render_target.GetWidthInPixels();
+        int render_target_width = bitmap.GetWidthInPixels();
         bitmap_info.bmiHeader.biWidth = static_cast<LONG>(render_target_width);
         // To ensure that the bitmap for the render target has an origin
         // at the top-left corner, the height needs to be made negative
         // to ensure the device independent bitmap is top-down.
-        int render_target_height = render_target.GetHeightInPixels();
+        int render_target_height = bitmap.GetHeightInPixels();
         bitmap_info.bmiHeader.biHeight = -1 * static_cast<LONG>(render_target_height);
         // The number of planes must always be 1.
         bitmap_info.bmiHeader.biPlanes = 1;
@@ -120,7 +120,7 @@ namespace WINDOWING
         GetClientRect(WindowHandle, &client_rectangle);
         constexpr int RENDER_TARGET_LEFT_X_POSITION = 0;
         constexpr int RENDER_TARGET_TOP_Y_POSITION = 0;
-        const uint32_t* pixel_data = render_target.GetRawData();
+        const uint32_t* pixel_data = bitmap.GetRawData();
         // The return value is ignored since there isn't much that can be meaningfully done
         // if copying fails.
         StretchDIBits(

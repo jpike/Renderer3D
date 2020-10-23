@@ -179,16 +179,16 @@ namespace GRAPHICS
     }
 
     /// Computes a viewing ray coming from this camera for the specified pixel coordinates.
-    /// @param[in]  pixel_coordinates - The coordinates of the render target
+    /// @param[in]  pixel_coordinates - The coordinates of the viewing plane
     ///     for the pixel through which to compute the viewing ray. 
-    /// @param[in]  render_target - The render target for which the viewing ray is to
+    /// @param[in]  viewing_plane - The viewing plane for which the viewing ray is to
     ///     be computed.
     /// @return The viewing ray from the camera through the specified coordinates;
     ///     the exact ray will vary depending on the type of projection this camera
     ///     is using.
     RAY_TRACING::Ray Camera::ViewingRay(
         const MATH::Vector2ui& pixel_coordinates,
-        const RenderTarget& render_target) const
+        const Bitmap& viewing_plane) const
     {
         // CONVERT THE PIXEL COORDINATES TO THE RANGE OF THE VIEWING PLANE.
         // In order to convert the current pixel coordinate to proper coordinates for the viewing ray,
@@ -201,7 +201,7 @@ namespace GRAPHICS
         // 2. Shift the coordinates down so that the minimum coordinates are negative.
         //      By doing this by the half-width of the render target, this means the
         //      new center will correspond with the center of the render target.
-        unsigned int render_target_width_in_pixels = render_target.GetWidthInPixels();
+        unsigned int render_target_width_in_pixels = viewing_plane.GetWidthInPixels();
         float render_target_half_width_in_pixels = render_target_width_in_pixels / 2.0f;
         float x_shifted_down = (x_pixel_center - render_target_half_width_in_pixels);
         // 3. Scale the coordinates to be in the range of the viewing plane
@@ -211,7 +211,7 @@ namespace GRAPHICS
         // The same conversion must happen for y, but since the render target pixel coordinates
         // have y increasing going down but the viewing plane has y increasing going up,
         // the y coordinate must be flipped.
-        unsigned int render_target_height_in_pixels = render_target.GetHeightInPixels();
+        unsigned int render_target_height_in_pixels = viewing_plane.GetHeightInPixels();
         float render_target_half_height_in_pixels = render_target_height_in_pixels / 2.0f;
         float y_pixel_center = pixel_coordinates.Y + OFFSET_TO_CENTER_OF_PIXEL;
         float y_shifted_down = (y_pixel_center - render_target_half_height_in_pixels);

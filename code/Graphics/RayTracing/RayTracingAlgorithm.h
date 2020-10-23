@@ -1,11 +1,11 @@
 #pragma once
 
 #include <optional>
+#include "Graphics/Bitmap.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Color.h"
 #include "Graphics/RayTracing/Ray.h"
 #include "Graphics/RayTracing/RayObjectIntersection.h"
-#include "Graphics/RenderTarget.h"
 #include "Graphics/Scene.h"
 
 /// Holds code related to ray tracing.
@@ -17,7 +17,7 @@ namespace GRAPHICS::RAY_TRACING
     {
     public:
         // PUBLIC METHODS.
-        void Render(const Scene& scene, const Camera& camera, GRAPHICS::RenderTarget& render_target);
+        void Render(const Scene& scene, const Camera& camera, GRAPHICS::Bitmap& render_target);
 
         // PUBLIC MEMBER VARIABLES FOR EASY ACCESS.
         /// True if ambient lighting should be calculated; false otherwise.

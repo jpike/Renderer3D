@@ -20,7 +20,7 @@ REM DEFINE FILES TO COMPILE/LINK.
 SET COMPILATION_FILE="..\Renderer3DTests.project"
 SET MAIN_CODE_DIR="..\code"
 SET TEST_CODE_DIR="..\testing"
-SET LIBRARIES=user32.lib gdi32.lib opengl32.lib Renderer3DLibrary.lib
+SET LIBRARIES=user32.lib gdi32.lib opengl32.lib glu32.lib Renderer3DLibrary.lib
 
 REM CREATE THE COMMAND LINE OPTIONS FOR THE FILES TO COMPILE/LINK.
 SET INCLUDE_DIRS=/I %MAIN_CODE_DIR% /I %TEST_CODE_DIR%

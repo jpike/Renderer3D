@@ -7,7 +7,7 @@ namespace GRAPHICS
     /// Renders some text onto the render target.
     /// @param[in]  text - The text to render.
     /// @param[in,out]  render_target - The target to render to.
-    void Renderer::Render(const GUI::Text& text, RenderTarget& render_target) const
+    void Renderer::Render(const GUI::Text& text, Bitmap& render_target) const
     {
         // MAKE SURE A FONT EXISTS.
         if (!text.Font)
@@ -48,7 +48,7 @@ namespace GRAPHICS
     /// @param[in]  scene - The scene to render.
     /// @param[in]  camera - The camera to use to view the scene.
     /// @param[in,out]  render_target - The target to render to.
-    void Renderer::Render(const Scene& scene, const Camera& camera, RenderTarget& render_target) const
+    void Renderer::Render(const Scene& scene, const Camera& camera, Bitmap& render_target) const
     {
         render_target.FillPixels(scene.BackgroundColor);
 
@@ -64,7 +64,7 @@ namespace GRAPHICS
     /// @param[in]  lights - Any lights that should illuminate the object.
     /// @param[in]  camera - The camera to use to view the object.
     /// @param[in,out]  render_target - The target to render to.
-    void Renderer::Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, RenderTarget& render_target) const
+    void Renderer::Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, Bitmap& render_target) const
     {
         // COMPUTE THE FINAL TRANSFORMATION MATRIX FOR THE OBJECT.
         MATH::Matrix4x4f object_world_transform = object_3D.WorldTransform();
@@ -335,7 +335,7 @@ namespace GRAPHICS
     /// @param[in]  triangle - The triangle to render (in screen-space coordinates).
     /// @param[in]  triangle_vertex_colors - The vertex colors of the triangle.
     /// @param[in,out]  render_target - The target to render to.
-    void Renderer::Render(const Triangle& triangle, const std::array<GRAPHICS::Color, Triangle::VERTEX_COUNT>& triangle_vertex_colors, RenderTarget& render_target) const
+    void Renderer::Render(const Triangle& triangle, const std::array<GRAPHICS::Color, Triangle::VERTEX_COUNT>& triangle_vertex_colors, Bitmap& render_target) const
     {
         // GET THE VERTICES.
         // They're needed for all kinds of shading.
@@ -634,13 +634,13 @@ namespace GRAPHICS
                                 }
 
                                 // LOOK UP THE TEXTURE COLOR AT THE COORDINATES.
-                                unsigned int texture_width_in_pixels = triangle.Material->Texture->Bitmap.GetWidthInPixels();                                
+                                unsigned int texture_width_in_pixels = triangle.Material->Texture->GetWidthInPixels();                                
                                 unsigned int texture_pixel_x_coordinate = static_cast<unsigned int>(texture_width_in_pixels * interpolated_texture_coordinate.X);
 
-                                unsigned int texture_height_in_pixels = triangle.Material->Texture->Bitmap.GetHeightInPixels();
+                                unsigned int texture_height_in_pixels = triangle.Material->Texture->GetHeightInPixels();
                                 unsigned int texture_pixel_y_coordinate = static_cast<unsigned int>(texture_height_in_pixels * interpolated_texture_coordinate.Y);
 
-                                Color texture_color = triangle.Material->Texture->Bitmap.GetPixel(texture_pixel_x_coordinate, texture_pixel_y_coordinate);
+                                Color texture_color = triangle.Material->Texture->GetPixel(texture_pixel_x_coordinate, texture_pixel_y_coordinate);
 
                                 interpolated_color = Color::ComponentMultiplyRedGreenBlue(interpolated_color, texture_color);
                                 interpolated_color.Clamp();
@@ -765,7 +765,7 @@ namespace GRAPHICS
         const float end_x,
         const float end_y,
         const Color& color,
-        RenderTarget& render_target) const
+        Bitmap& render_target) const
     {
         // COMPUTE THE INCREMENTS ALONG EACH AXIS FOR EACH PIXEL.
         // Each time we draw a pixel, we need to move slightly
@@ -831,7 +831,7 @@ namespace GRAPHICS
         const float end_y,
         const Color& start_color,
         const Color& end_color,
-        RenderTarget& render_target) const
+        Bitmap& render_target) const
     {
         // COMPUTE THE LENGTH OF THE ENTIRE LINE.
         MATH::Vector2f vector_from_start_to_end(end_x - start_x, end_y - start_y);

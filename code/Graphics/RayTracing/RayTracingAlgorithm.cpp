@@ -11,7 +11,7 @@ namespace RAY_TRACING
     /// @param[in]  scene - The scene to render.
     /// @param[in]  camera - The camera to use to view the scene.
     /// @param[in,out]  render_target - The target to render to.
-    void RayTracingAlgorithm::Render(const Scene& scene, const Camera& camera, GRAPHICS::RenderTarget& render_target)
+    void RayTracingAlgorithm::Render(const Scene& scene, const Camera& camera, GRAPHICS::Bitmap& render_target)
     {
         // TRANSFORM OBJECTS IN THE SCENE INTO WORLD SPACE.
         Scene scene_with_world_space_objects;

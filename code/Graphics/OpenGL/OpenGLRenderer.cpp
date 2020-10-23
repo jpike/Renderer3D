@@ -160,12 +160,12 @@ namespace GRAPHICS::OPEN_GL
                     GL_TEXTURE_2D,
                     0, // level of detail
                     GL_RGBA, // this is the only thing we currently support
-                    triangle.Material->Texture->Bitmap.GetWidthInPixels(),
-                    triangle.Material->Texture->Bitmap.GetHeightInPixels(),
+                    triangle.Material->Texture->GetWidthInPixels(),
+                    triangle.Material->Texture->GetHeightInPixels(),
                     0, // no border
                     GL_RGBA,
                     GL_UNSIGNED_BYTE, // one byte per color component
-                    triangle.Material->Texture->Bitmap.GetRawData());
+                    triangle.Material->Texture->GetRawData());
             }
 
             // START RENDERING THE APPROPRIATE TYPE OF PRIMITIVE.

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
+#include <memory>
 #include "Containers/Array2D.h"
 #include "Graphics/Color.h"
 #include "Graphics/ColorFormat.h"
@@ -8,17 +10,22 @@
 /// Holds computer graphics code.
 namespace GRAPHICS
 {
-    /// A 2D rectangle to which graphics can be rendered.
+    /// A 2D rectangular bitmap.
+    /// The general concept of a bitmap image (https://en.wikipedia.org/wiki/Bitmap)
+    /// is used over alternative terms (frame, screen, surface, canvas, render target, etc.)
+    /// to allow this class to be re-used in more contexts.
+    ///
     /// Specific features include:
     /// - (0,0) is the top-left corner.
     /// - 32 bits per pixel.
     /// - Each pixel stores colors in the following format
     ///   (assumes a little-endian architecture): 0xRRGGBBAA.
-    class RenderTarget
+    class Bitmap
     {
     public:
         // CONSTRUCTION/DESTRUCTION.
-        explicit RenderTarget(
+        static std::shared_ptr<Bitmap> Load(const std::filesystem::path& filepath);
+        explicit Bitmap(
             const unsigned int width_in_pixels,
             const unsigned int height_in_pixels,
             const GRAPHICS::ColorFormat color_format);
@@ -38,11 +45,11 @@ namespace GRAPHICS
 
     private:
         // MEMBER VARIABLES.
-        /// The width of the render target in pixels.
+        /// The width of the bitmap in pixels.
         unsigned int WidthInPixels;
-        /// The height of the render target in pixels.
+        /// The height of the bitmap in pixels.
         unsigned int HeightInPixels;
-        /// The color format of pixels in the render target.
+        /// The color format of pixels in the bitmap.
         GRAPHICS::ColorFormat ColorFormat;
         /// The underlying pixel memory to which graphics are rendered.
         /// The top-left corner pixel is at (0,0), and 

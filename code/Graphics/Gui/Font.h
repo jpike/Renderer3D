@@ -3,8 +3,8 @@
 #include <array>
 #include <memory>
 #include <Windows.h>
+#include "Graphics/Bitmap.h"
 #include "Graphics/Gui/Glyph.h"
-#include "Graphics/RenderTarget.h"
 
 /// Holds code related to standard GUIs (graphical user interfaces - https://en.wikipedia.org/wiki/Graphical_user_interface).
 namespace GRAPHICS::GUI
@@ -38,6 +38,6 @@ namespace GRAPHICS::GUI
         std::array<Glyph, CHARACTER_COUNT> GlyphsByCharacter = {};
         /// The pixels for the font.
         /// The color format is chosen to be compatible with the format used by Windows by default.
-        RenderTarget Pixels = RenderTarget(GLYPH_BITMAP_DIMENSION_IN_PIXELS, GLYPH_BITMAP_DIMENSION_IN_PIXELS, ColorFormat::ARGB);
+        Bitmap Pixels = Bitmap(GLYPH_BITMAP_DIMENSION_IN_PIXELS, GLYPH_BITMAP_DIMENSION_IN_PIXELS, ColorFormat::ARGB);
     };
 }

@@ -1,7 +1,7 @@
 #pragma once
 
+#include "Graphics/Bitmap.h"
 #include "Graphics/Color.h"
-#include "Graphics/RenderTarget.h"
 #include "MATH/Vector2.h"
 
 namespace GRAPHICS::GUI
@@ -22,6 +22,6 @@ namespace GRAPHICS::GUI
         /// The left/top offset within the entire font pixels where this glyph starts.
         MATH::Vector2ui LeftTopOffsetInFontPixels = MATH::Vector2ui(0, 0);
         /// The entire set of pixels for the from from which this glyph came.
-        const RenderTarget* FontPixels = nullptr;
+        const Bitmap* FontPixels = nullptr;
     };
 }

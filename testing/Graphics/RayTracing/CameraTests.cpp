@@ -9,7 +9,7 @@ TEST_CASE("An orthographic viewing ray for the top-left corner can be correctly 
     // which makes understanding pixel centers easier.
     constexpr unsigned int RENDER_TARGET_WIDTH_IN_PIXELS = 20;
     constexpr unsigned int RENDER_TARGET_HEIGHT_IN_PIXELS = 20;
-    GRAPHICS::RenderTarget render_target(
+    GRAPHICS::Bitmap render_target(
         RENDER_TARGET_WIDTH_IN_PIXELS,
         RENDER_TARGET_HEIGHT_IN_PIXELS,
         GRAPHICS::ColorFormat::RGBA);
@@ -47,7 +47,7 @@ TEST_CASE("An orthographic viewing ray for the top-right corner can be correctly
     // which makes understanding pixel centers easier.
     constexpr unsigned int RENDER_TARGET_WIDTH_IN_PIXELS = 20;
     constexpr unsigned int RENDER_TARGET_HEIGHT_IN_PIXELS = 20;
-    GRAPHICS::RenderTarget render_target(
+    GRAPHICS::Bitmap render_target(
         RENDER_TARGET_WIDTH_IN_PIXELS,
         RENDER_TARGET_HEIGHT_IN_PIXELS,
         GRAPHICS::ColorFormat::RGBA);
@@ -87,7 +87,7 @@ TEST_CASE("An orthographic viewing ray for the bottom-left corner can be correct
     // which makes understanding pixel centers easier.
     constexpr unsigned int RENDER_TARGET_WIDTH_IN_PIXELS = 20;
     constexpr unsigned int RENDER_TARGET_HEIGHT_IN_PIXELS = 20;
-    GRAPHICS::RenderTarget render_target(
+    GRAPHICS::Bitmap render_target(
         RENDER_TARGET_WIDTH_IN_PIXELS,
         RENDER_TARGET_HEIGHT_IN_PIXELS,
         GRAPHICS::ColorFormat::RGBA);
@@ -127,7 +127,7 @@ TEST_CASE("An orthographic viewing ray for the bottom-right corner can be correc
     // which makes understanding pixel centers easier.
     constexpr unsigned int RENDER_TARGET_WIDTH_IN_PIXELS = 20;
     constexpr unsigned int RENDER_TARGET_HEIGHT_IN_PIXELS = 20;
-    GRAPHICS::RenderTarget render_target(
+    GRAPHICS::Bitmap render_target(
         RENDER_TARGET_WIDTH_IN_PIXELS,
         RENDER_TARGET_HEIGHT_IN_PIXELS,
         GRAPHICS::ColorFormat::RGBA);
@@ -167,7 +167,7 @@ TEST_CASE("An orthographic viewing ray for the center can be correctly computed.
     // which makes understanding pixel centers easier.
     constexpr unsigned int RENDER_TARGET_WIDTH_IN_PIXELS = 20;
     constexpr unsigned int RENDER_TARGET_HEIGHT_IN_PIXELS = 20;
-    GRAPHICS::RenderTarget render_target(
+    GRAPHICS::Bitmap render_target(
         RENDER_TARGET_WIDTH_IN_PIXELS,
         RENDER_TARGET_HEIGHT_IN_PIXELS,
         GRAPHICS::ColorFormat::RGBA);
@@ -208,7 +208,7 @@ TEST_CASE("An orthographic viewing ray for the top-right quadrant can be correct
     // which makes understanding pixel centers easier.
     constexpr unsigned int RENDER_TARGET_WIDTH_IN_PIXELS = 20;
     constexpr unsigned int RENDER_TARGET_HEIGHT_IN_PIXELS = 20;
-    GRAPHICS::RenderTarget render_target(
+    GRAPHICS::Bitmap render_target(
         RENDER_TARGET_WIDTH_IN_PIXELS,
         RENDER_TARGET_HEIGHT_IN_PIXELS,
         GRAPHICS::ColorFormat::RGBA);
@@ -246,7 +246,7 @@ TEST_CASE("An orthographic viewing ray for the top-left quadrant can be correctl
     // which makes understanding pixel centers easier.
     constexpr unsigned int RENDER_TARGET_WIDTH_IN_PIXELS = 20;
     constexpr unsigned int RENDER_TARGET_HEIGHT_IN_PIXELS = 20;
-    GRAPHICS::RenderTarget render_target(
+    GRAPHICS::Bitmap render_target(
         RENDER_TARGET_WIDTH_IN_PIXELS,
         RENDER_TARGET_HEIGHT_IN_PIXELS,
         GRAPHICS::ColorFormat::RGBA);
@@ -284,7 +284,7 @@ TEST_CASE("An orthographic viewing ray for the bottom-left quadrant can be corre
     // which makes understanding pixel centers easier.
     constexpr unsigned int RENDER_TARGET_WIDTH_IN_PIXELS = 20;
     constexpr unsigned int RENDER_TARGET_HEIGHT_IN_PIXELS = 20;
-    GRAPHICS::RenderTarget render_target(
+    GRAPHICS::Bitmap render_target(
         RENDER_TARGET_WIDTH_IN_PIXELS,
         RENDER_TARGET_HEIGHT_IN_PIXELS,
         GRAPHICS::ColorFormat::RGBA);
@@ -322,7 +322,7 @@ TEST_CASE("An orthographic viewing ray for the bottom-right quadrant can be corr
     // which makes understanding pixel centers easier.
     constexpr unsigned int RENDER_TARGET_WIDTH_IN_PIXELS = 20;
     constexpr unsigned int RENDER_TARGET_HEIGHT_IN_PIXELS = 20;
-    GRAPHICS::RenderTarget render_target(
+    GRAPHICS::Bitmap render_target(
         RENDER_TARGET_WIDTH_IN_PIXELS,
         RENDER_TARGET_HEIGHT_IN_PIXELS,
         GRAPHICS::ColorFormat::RGBA);
