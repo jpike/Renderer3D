@@ -80,8 +80,8 @@ TEST_CASE("World transform can rotate a vector 30 degrees around the z-axis.", "
 
     // VERIFY THE TRANSFORMATION OF THE 3D OBJECT.
     const MATH::Vector4f EXPECTED_TOP_WORLD_VERTEX(
-        -1.0f / 2.0f, 
-        std::sqrt(3.0f) / 2.0f, 
+        -0.5f, // -1.0f / 2.0f,
+        0.86603f, // std::sqrt(3.0f) / 2.0f, 
         0.0f, 
         1.0f);
     const MATH::Vector4f& actual_top_world_vertex = world_vertices[0];
@@ -91,8 +91,8 @@ TEST_CASE("World transform can rotate a vector 30 degrees around the z-axis.", "
     REQUIRE(EXPECTED_TOP_WORLD_VERTEX.W == Approx(actual_top_world_vertex.W));
 
     const MATH::Vector4f EXPECTED_LEFT_WORLD_VERTEX(
-        -std::sqrt(3.0f)/2.0f + 0.5f, // -1*cos(30) - -1*sin(30) = -1*sqrt(3)/2 + 1*1/2 = -sqrt(3)/2 + 1/2
-        -0.5f - std::sqrt(3.0f)/2.0f, // -1*sin(30) + -1*cos(30) = -1*1/2 -1*sqrt(3)/2 = -1/2 - sqrt(3)/2
+        -0.36603f, //-std::sqrt(3.0f)/2.0f + 0.5f, // -1*cos(30) - -1*sin(30) = -1*sqrt(3)/2 + 1*1/2 = -sqrt(3)/2 + 1/2
+        -1.36603f, // -0.5f - std::sqrt(3.0f)/2.0f, // -1*sin(30) + -1*cos(30) = -1*1/2 -1*sqrt(3)/2 = -1/2 - sqrt(3)/2
         0.0f, 
         1.0f);
     const MATH::Vector4f& actual_left_world_vertex = world_vertices[1];
@@ -102,8 +102,8 @@ TEST_CASE("World transform can rotate a vector 30 degrees around the z-axis.", "
     REQUIRE(EXPECTED_LEFT_WORLD_VERTEX.W == Approx(actual_left_world_vertex.W));
 
     const MATH::Vector4f EXPECTED_RIGHT_WORLD_VERTEX(
-        std::sqrt(3.0f)/2.0f + 0.5f, // 1*cos(30) - -1*sin(30) = 1*sqrt(3)/2 - -1*1/2 = sqrt(3)/2 + 1/2
-        0.5f - std::sqrt(3.0f)/2.0f, // 1*sin(30) + -1*cos(30) = 1*1/2 + -1*sqrt(3)/2 = 1/2 - sqrt(3)/2
+        1.36603f, // std::sqrt(3.0f)/2.0f + 0.5f, // 1*cos(30) - -1*sin(30) = 1*sqrt(3)/2 - -1*1/2 = sqrt(3)/2 + 1/2
+        -0.36603f, //0.5f - std::sqrt(3.0f)/2.0f, // 1*sin(30) + -1*cos(30) = 1*1/2 + -1*sqrt(3)/2 = 1/2 - sqrt(3)/2
         0.0f, 
         1.0f);
     const MATH::Vector4f& actual_right_world_vertex = world_vertices[2];
