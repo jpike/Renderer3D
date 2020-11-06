@@ -202,7 +202,14 @@ namespace MATH
         MATH::Matrix4x4<ElementType> y_rotation_matrix = RotateY(angles_in_radians.Y);
         MATH::Matrix4x4<ElementType> z_rotation_matrix = RotateZ(angles_in_radians.Z);
 
-        MATH::Matrix4x4<ElementType> rotation_matrix = x_rotation_matrix * y_rotation_matrix * z_rotation_matrix;
+        /// @todo   What order should our rotation matrices be?
+        /// Maybe we should have the order be specified in the method name?
+        /// First line below was original order, but switched to second approach after it seemed more intuitive
+        /// for object transforms for test cases (apply rotations in XYZ order).  It may not matter,
+        /// but we should probably be consistent.  Other methods of orientation are probably better
+        /// in the future.
+        //MATH::Matrix4x4<ElementType> rotation_matrix = x_rotation_matrix * y_rotation_matrix * z_rotation_matrix;
+        MATH::Matrix4x4<ElementType> rotation_matrix = z_rotation_matrix * y_rotation_matrix * x_rotation_matrix;
         return rotation_matrix;
     }
 

@@ -3,4 +3,3 @@
 
 #include "Graphics/CameraTests.cpp"
 #include "Graphics/Object3DTests.cpp"
-#include "Graphics/RayTracing/CameraTests.cpp"
