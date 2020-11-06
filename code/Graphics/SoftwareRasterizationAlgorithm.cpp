@@ -25,9 +25,10 @@ namespace GRAPHICS
     /// @param[in,out]  output_bitmap - The bitmap to render to.
     void SoftwareRasterizationAlgorithm::Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, Bitmap& output_bitmap) const
     {
-        // GET THE OBJECT'S WORLD TRANSFORMATION MATRIX.
-        // This is done before the loop to avoid performance hits for repeatedly calculating it.
+        // GET RE-USED TRANSFORMATION MATRICES.
+        // This is done before the loop to avoid performance hits for repeatedly calculating these matrices.
         MATH::Matrix4x4f object_world_transform = object_3D.WorldTransform();
+        MATH::Matrix4x4f camera_view_transform = camera.ViewTransform();
 
         // RENDER EACH TRIANGLE OF THE OBJECT.
         for (const auto& local_triangle : object_3D.Triangles)
@@ -50,8 +51,17 @@ namespace GRAPHICS
             /// @todo   Clipping against camera z-boundaries!
 
             /// @todo   Surface normal!
+            MATH::Vector3f unit_surface_normal = world_space_triangle.SurfaceNormal();
 
             // TRANSFORM THE TRIANGLE FOR PROPER CAMERA VIEWING.
+            /// @todo   Combine this with previous loop?
+            for (std::size_t vertex_index = 0; vertex_index < triangle_vertex_count; ++vertex_index)
+            {
+                const MATH::Vector3f& world_vertex = world_space_triangle.Vertices[vertex_index];
+                MATH::Vector4f world_homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(world_vertex);
+
+                MATH::Vector4f view_vertex = camera_view_transform * world_homogeneous_vertex;
+            }
 
             /// @todo   Render screen-space triangle!
         }
