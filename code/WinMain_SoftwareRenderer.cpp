@@ -24,6 +24,7 @@
 static std::unique_ptr<WINDOWING::Win32Window> g_window = nullptr;
 static GRAPHICS::Camera g_camera;
 static MATH::Vector3<bool> g_rotation_enabled;
+static GRAPHICS::Scene g_scene;
 
 /// The main window callback procedure for processing messages sent to the main application window.
 /// @param[in]  window - Handle to the window.
@@ -147,6 +148,22 @@ LRESULT CALLBACK MainWindowCallback(
                     g_rotation_enabled.Z = !g_rotation_enabled.Z;
                     break;
                 }
+                case 0x42: // B
+                {
+                    break;
+                };
+                case 0x53: // S
+                {
+                    break;
+                };
+                case 0x4D: // M
+                {
+                    break;
+                };
+                case 0x4C: // L
+                {
+                    break;
+                };
                 default:
                     virtual_key_code;
                     break;
@@ -254,8 +271,7 @@ int CALLBACK WinMain(
                 MATH::Vector3f(1.0f, -1.0f, 0.0f)
             })
     };
-    GRAPHICS::Scene scene;
-    scene.Objects.push_back(triangle_object);
+    g_scene.Objects.push_back(triangle_object);
 
     // RUN A MESSAGE LOOP.
     float object_rotation_angle_in_radians = 0.0f;
@@ -307,7 +323,7 @@ int CALLBACK WinMain(
         auto current_time = std::chrono::high_resolution_clock::now();
         auto total_elapsed_time = std::chrono::duration_cast<std::chrono::duration<float>>(current_time - start_time).count();
         object_rotation_angle_in_radians = 0.5f * total_elapsed_time;
-        for (auto& object_3D : scene.Objects)
+        for (auto& object_3D : g_scene.Objects)
         {
             object_3D;
             if (g_rotation_enabled.X)
@@ -326,11 +342,11 @@ int CALLBACK WinMain(
 
         // RENDER THE 3D SCENE.
         g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
-        scene.BackgroundColor = GRAPHICS::Color::RED;
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(scene, g_camera, perspective_projected_drawing);
+        g_scene.BackgroundColor = GRAPHICS::Color::RED;
+        GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, perspective_projected_drawing);
         g_camera.Projection = GRAPHICS::ProjectionType::ORTHOGRAPHIC;
-        scene.BackgroundColor = GRAPHICS::Color::BLUE;
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(scene, g_camera, orthographic_projected_drawing);
+        g_scene.BackgroundColor = GRAPHICS::Color::BLUE;
+        GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, orthographic_projected_drawing);
 
         // RENDER DEBUG TEXT.
         debug_text_drawing.FillPixels(GRAPHICS::Color::BLACK);
@@ -341,7 +357,7 @@ int CALLBACK WinMain(
 
         GRAPHICS::GUI::Text control_help_text =
         {
-            .String = "Camera Position = Arrow Keys,D | Clip Planes = N,F | FOV = V | XYZ = Rotate",
+            .String = "CamP=Arrow,D|Clip=N,F|FOV=V|B=Backface|XYZ=Rotate|S=Scene|M=Mat|L=Light",
             .Font = font.get(),
             .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
         };

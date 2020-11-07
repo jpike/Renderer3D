@@ -105,9 +105,17 @@ namespace GRAPHICS
 
             /// @todo   Surface normal!
             MATH::Vector3f unit_surface_normal = world_space_triangle.SurfaceNormal();
+            MATH::Vector3f view_direction = -camera.CoordinateFrame.Forward;
+            float surface_normal_camera_view_direction_dot_product = MATH::Vector3f::DotProduct(unit_surface_normal, view_direction);
+            bool triangle_facing_toward_camera = (surface_normal_camera_view_direction_dot_product < 0.0f);
+            if (!triangle_facing_toward_camera)
+            {
+                continue;
+            }
 
             // TRANSFORM THE TRIANGLE FOR PROPER CAMERA VIEWING.
             /// @todo   Combine this with previous loop?
+            bool triangle_within_near_far_clip_planes = true;
             Triangle screen_space_triangle = world_space_triangle;
             for (std::size_t vertex_index = 0; vertex_index < triangle_vertex_count; ++vertex_index)
             {
@@ -115,6 +123,12 @@ namespace GRAPHICS
                 MATH::Vector4f world_homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(world_vertex);
 
                 MATH::Vector4f view_vertex = camera_view_transform * world_homogeneous_vertex;
+
+                float near_z_boundary = camera.WorldPosition.Z - camera.NearClipPlaneViewDistance;
+                float far_z_boundary = camera.WorldPosition.Z - camera.FarClipPlaneViewDistance;
+                // "Direction" of <= comparisons is reversed due to being along negative Z axis.
+                bool current_vertex_within_near_far_clip_planes = (near_z_boundary >= view_vertex.Z && view_vertex.Z >= far_z_boundary);
+                triangle_within_near_far_clip_planes = triangle_within_near_far_clip_planes && current_vertex_within_near_far_clip_planes;
 
                 MATH::Vector4f projected_vertex = camera_projection_transform * view_vertex;
 
@@ -124,6 +138,11 @@ namespace GRAPHICS
 
                 MATH::Vector4f screen_space_vertex = screen_transform * transformed_vertex;
                 screen_space_triangle.Vertices[vertex_index] = MATH::Vector3f(screen_space_vertex.X, screen_space_vertex.Y, screen_space_vertex.Z);
+            }
+
+            if (!triangle_within_near_far_clip_planes)
+            {
+                continue;
             }
 
             /// @todo   Render screen-space triangle!
