@@ -76,14 +76,15 @@ namespace GRAPHICS
         // CREATE THE BASIC PERSPECTIVE MATRIX.
         MATH::Matrix4x4f perspective_matrix;
         // Multiples the x/y coordinates by the near z world boundary so that the x/y coordinates
-        // can be properly scaled relative to the near plain and the corresponding z coordinate.
+        // can be properly scaled relative to the near plane and the corresponding z coordinate.
         perspective_matrix.Elements(0, 0) = near_z_world_boundary;
         perspective_matrix.Elements(1, 1) = near_z_world_boundary;
         // Ensures that points on the near and far z planes are left alone in terms of the z coordinate.
         perspective_matrix.Elements(2, 2) = near_z_world_boundary + far_z_world_boundary;
         perspective_matrix.Elements(3, 2) = -far_z_world_boundary * near_z_world_boundary;
-        // Helps preserve the z coordinate.
-        perspective_matrix.Elements(2, 3) = 1.0f;
+        // Helps preserve the z coordinate.  Since we're looking down the negative z-axis,
+        // the sign is negated so that the perspective divide doesn't flip the x/y coordinates.
+        perspective_matrix.Elements(2, 3) = -1.0f;
 
         // CREATE THE ORTHOGRAPHIC MATRIX.
         // The tangent function requires the field of view in radians.
@@ -176,6 +177,60 @@ namespace GRAPHICS
         // FORM THE FINAL VIEW TRANSFORM MATRIX.
         MATH::Matrix4x4f view_transform = align_camera_to_world_matrix * translate_camera_to_origin_matrix;
         return view_transform;
+    }
+
+    /// Computes the projection transformation for the camera.
+    /// @return The projection transform for the camera.
+    MATH::Matrix4x4f Camera::ProjectionTransform() const
+    {
+        // CREATE THE ORTHOGRAPHIC MATRIX.
+        // This is needed regardless of the type of projection transform.
+
+        // Since the camera looks down the negative Z axis, the distances should be subtracted
+        // from the camera's world position to form the viewing boundaries.
+        /// @todo   Does this need to take into account the orientation of the camera?
+        float near_z_world_boundary = WorldPosition.Z - NearClipPlaneViewDistance;
+        float far_z_world_boundary = WorldPosition.Z - FarClipPlaneViewDistance;
+
+        // The tangent function requires the field of view in radians.
+        MATH::Angle<float>::Radians field_of_view_in_radians = MATH::Angle<float>::DegreesToRadians(FieldOfView);
+        // Half of the field of view defines how "high" the view frustum's near plane should be.
+        float half_field_of_view_in_radians = field_of_view_in_radians.Value / 2.0f;
+        float half_field_of_view_tangent = tan(half_field_of_view_in_radians);
+
+        // An orthographic projection can handle projecting to the near plane of the frustum.
+        float near_z_distance = abs(near_z_world_boundary);
+        float top_y_world_boundary = half_field_of_view_tangent * near_z_distance;
+        float bottom_y_world_boundary = -top_y_world_boundary;
+        float right_x_world_boundary = top_y_world_boundary;
+        float left_x_world_boundary = -right_x_world_boundary;
+
+        MATH::Matrix4x4f orthographic_matrix = OrthographicProjection(
+            left_x_world_boundary,
+            right_x_world_boundary,
+            bottom_y_world_boundary,
+            top_y_world_boundary,
+            near_z_world_boundary,
+            far_z_world_boundary);
+
+        // RETURN THE PROPER PROJECTION MATRIX.
+        bool is_perspective = (ProjectionType::PERSPECTIVE == Projection);
+        if (is_perspective)
+        {
+            // USE A PERSPECTIVE MATRIX.
+            /// @todo   Reduce duplication of orthographic matrix computation!
+            MATH::Matrix4x4f perspective_matrix = PerspectiveProjection(
+                FieldOfView,
+                1.0f,
+                near_z_world_boundary,
+                far_z_world_boundary);
+            return perspective_matrix;
+        }
+        else
+        {
+            // JUST USE THE ORTHOGRAPHIC MATRIX.
+            return orthographic_matrix;
+        }
     }
 
     /// Computes a viewing ray coming from this camera for the specified pixel coordinates.

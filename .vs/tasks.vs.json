@@ -1,6 +1,6 @@
 {
   "version": "0.2.1",
-    "tasks":
+    "tasks": 
     [
         {
             "taskName": "task-build-library",
@@ -25,6 +25,14 @@
             "type": "launch",
             "contextType": "build",
             "command": "build_demo.bat"
+        },
+        {
+            "taskName": "task-build-demo-software",
+            "taskLabel": "task-build-demo-software",
+            "appliesTo": "build_demo_software.bat",
+            "type": "launch",
+            "contextType": "build",
+            "command": "build_demo_software.bat"
         }
     ]
 }

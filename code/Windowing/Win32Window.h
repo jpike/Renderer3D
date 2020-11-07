@@ -22,6 +22,7 @@ namespace WINDOWING
 
         // RENDERING.
         void Display(const GRAPHICS::Bitmap& bitmap);
+        void DisplayAt(const GRAPHICS::Bitmap& bitmap, int left_x, int top_y);
 
         // MEMBER VARIABLES.
         /// The handle to window.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <string>
 
 namespace MATH
 {
@@ -36,6 +37,7 @@ namespace MATH
 
         // OTHER OPERATIONS.
         ComponentType Length() const;
+        std::string ToString() const;
 
         // PUBLIC MEMBER VARIABLES FOR EASY ACCESS.
         /// The x component of the vector.
@@ -228,5 +230,19 @@ namespace MATH
         ComponentType length_squared = Vector3<ComponentType>::DotProduct(*this, *this);
         ComponentType length = sqrt(length_squared);
         return length;
+    }
+
+    /// Gets a string representation of the vector.
+    /// @return A string representation of the vector.
+    template <typename ComponentType>
+    std::string Vector3<ComponentType>::ToString() const
+    {
+        std::string string_representation = 
+            "(" + 
+                std::to_string(X) + ", " +
+                std::to_string(Y) + ", " +
+                std::to_string(Z) +
+            ")";
+        return string_representation;
     }
 }

@@ -1,0 +1,4 @@
+// To avoid annoyances with Windows min/max #defines.
+#define NOMINMAX
+
+#include "WinMain_SoftwareRenderer.cpp"

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include "Graphics/Bitmap.h"
 #include "Graphics/ProjectionType.h"
 #include "Graphics/RayTracing/Ray.h"
@@ -36,6 +37,7 @@ namespace GRAPHICS
 
         // TRANSFORM METHODS.
         MATH::Matrix4x4f ViewTransform() const;
+        MATH::Matrix4x4f ProjectionTransform() const;
 
         // RAY TRACING METHODS.
         RAY_TRACING::Ray ViewingRay(
@@ -49,8 +51,13 @@ namespace GRAPHICS
         MATH::Vector3f WorldPosition = MATH::Vector3f(0.0f, 0.0f, 1.0f);
         /// The coordinate frame for the camera's orientation.
         MATH::CoordinateFrame CoordinateFrame = MATH::CoordinateFrame();
-        /// The field of view of the camera.
-        MATH::Angle<float>::Degrees FieldOfView = MATH::Angle<float>::Degrees(45.0f);
+        /// The distance of the near clip plane along the camera's viewing direction.
+        float NearClipPlaneViewDistance = 0.0f;
+        /// The distance of the far clip plane along the camera's viewing direction.
+        float FarClipPlaneViewDistance = std::numeric_limits<float>::max();
+        /// The field of view of the camera.  Applies both horizontally and vertically,
+        /// but this can be changed later if necessary.
+        MATH::Angle<float>::Degrees FieldOfView = MATH::Angle<float>::Degrees(90.0f);
         /// The viewing plane onto which the image is projected.
         GRAPHICS::ViewingPlane ViewingPlane = GRAPHICS::ViewingPlane();
     };

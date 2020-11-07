@@ -17,6 +17,7 @@ namespace MATH
     {
     public:
         // STATIC METHODS.
+        static Vector4 Scale(const ComponentType scale_factor, const Vector4& vector);
         static Vector4 Normalize(const Vector4& vector);
         static ComponentType DotProduct(const Vector4& vector_1, const Vector4& vector_2);
 
@@ -53,6 +54,21 @@ namespace MATH
     // DEFINE COMMON VECTOR4 TYPES.
     /// A vector composed of 4 float components.
     typedef Vector4<float> Vector4f;
+
+    /// Computes a scaled version of a vector.
+    /// @param[in]  scale_factor - The scale factor to multiply each component of the vector by.
+    /// @param[in]  vector - The vector to scale.
+    /// @return The scaled version of the vector.
+    template <typename ComponentType>
+    Vector4<ComponentType> Vector4<ComponentType>::Scale(const ComponentType scale_factor, const Vector4<ComponentType>& vector)
+    {
+        Vector4<ComponentType> scaled_vector;
+        scaled_vector.X = scale_factor * vector.X;
+        scaled_vector.Y = scale_factor * vector.Y;
+        scaled_vector.Z = scale_factor * vector.Z;
+        scaled_vector.W = scale_factor * vector.W;
+        return scaled_vector;
+    }
 
     /// Normalizes a vector to be unit length (length of 1).
     /// @param[in]  vector - The vector to normalize.
