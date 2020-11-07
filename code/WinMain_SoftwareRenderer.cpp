@@ -23,6 +23,7 @@
 /// The window for the application.
 static std::unique_ptr<WINDOWING::Win32Window> g_window = nullptr;
 static GRAPHICS::Camera g_camera;
+static MATH::Vector3<bool> g_rotation_enabled;
 
 /// The main window callback procedure for processing messages sent to the main application window.
 /// @param[in]  window - Handle to the window.
@@ -62,6 +63,9 @@ LRESULT CALLBACK MainWindowCallback(
         case WM_KEYDOWN:
         {
 #if 1
+            /// @todo   GetKeyState vs GetAsyncKeyState()?
+            bool shift_down = GetAsyncKeyState(VK_SHIFT) & 0x8000;
+
             constexpr float CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS = 0.1f;
             constexpr float CAMERA_ROTATE_DEGREES_PER_KEY_PRESS = 1.0f;
             int virtual_key_code = static_cast<int>(w_param);
@@ -80,56 +84,67 @@ LRESULT CALLBACK MainWindowCallback(
                 case VK_RIGHT:
                     g_camera.WorldPosition.X += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
                     break;
-                case 0x57: // W
-                    g_camera.WorldPosition.Z -= CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
-                    break;
-                case 0x53: // S
-                    g_camera.WorldPosition.Z += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
-                    break;
-                case 0x41: // A
+                case 0x44: // D (depth)
                 {
+                    if (shift_down)
+                    {
+                        g_camera.WorldPosition.Z -= CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    }
+                    else
+                    {
+                        g_camera.WorldPosition.Z += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    }
                     break;
                 }
-                case 0x44: // D
+                case 0x4E: // N
                 {
+                    if (shift_down)
+                    {
+                        g_camera.NearClipPlaneViewDistance += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    }
+                    else
+                    {
+                        g_camera.NearClipPlaneViewDistance -= CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    }
                     break;
                 }
-                case 0x51: // Q
+                case 0x46: // F
                 {
+                    if (shift_down)
+                    {
+                        g_camera.FarClipPlaneViewDistance += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    }
+                    else
+                    {
+                        g_camera.FarClipPlaneViewDistance -= CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
+                    }
+                    break;
+                }
+                case 0x56: // V
+                {
+                    if (shift_down)
+                    {
+                        g_camera.FieldOfView.Value += CAMERA_ROTATE_DEGREES_PER_KEY_PRESS;
+                    }
+                    else
+                    {
+                        g_camera.FieldOfView.Value -= CAMERA_ROTATE_DEGREES_PER_KEY_PRESS;
+                    }
+                    break;
+                }
+                case 0x58: // X
+                {
+                    g_rotation_enabled.X = !g_rotation_enabled.X;
+                    break;
+                }
+                case 0x59: // Y
+                {
+                    g_rotation_enabled.Y = !g_rotation_enabled.Y;
                     break;
                 }
                 case 0x5A: // Z
                 {
-                    break;
-                }
-                case 0x30: // 0
-                {
-                    break;
-                }
-                case 0x50: // P
-                {
-                    break;
-                }
-                case 0x4D: // M
-                {
-                    break;
-                }
-                case 0x4C: // L
-                {
-                    break;
-                }
-
-                /// @todo
-                case 0x31: // 1
-                {
-                    break;
-                }
-                case 0x32: // 2
-                {
-                    break;
-                }
-                case 0x33: // 3
-                {
+                    g_rotation_enabled.Z = !g_rotation_enabled.Z;
                     break;
                 }
                 default:
@@ -295,12 +310,18 @@ int CALLBACK WinMain(
         for (auto& object_3D : scene.Objects)
         {
             object_3D;
-#define ROTATE_OBJECTS 1
-#if ROTATE_OBJECTS
-            object_3D.RotationInRadians.X = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
-            object_3D.RotationInRadians.Y = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
-            object_3D.RotationInRadians.Z = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
-#endif
+            if (g_rotation_enabled.X)
+            {
+                object_3D.RotationInRadians.X = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            }
+            if (g_rotation_enabled.Y)
+            {
+                object_3D.RotationInRadians.Y = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            }
+            if (g_rotation_enabled.Z)
+            {
+                object_3D.RotationInRadians.Z = MATH::Angle<float>::Radians(object_rotation_angle_in_radians);
+            }
         }
 
         // RENDER THE 3D SCENE.
@@ -317,6 +338,16 @@ int CALLBACK WinMain(
         // DISPLAY STATISICS ABOUT FRAME TIMING.
         frame_timer.EndTimingFrame();
         float debug_text_top_y_position = 0.0f;
+
+        GRAPHICS::GUI::Text control_help_text =
+        {
+            .String = "Camera Position = Arrow Keys,D | Clip Planes = N,F | FOV = V | XYZ = Rotate",
+            .Font = font.get(),
+            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
+        };
+        GRAPHICS::SoftwareRasterizationAlgorithm::Render(control_help_text, debug_text_drawing);
+
+        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
         GRAPHICS::GUI::Text frame_timing_text =
         {
             .String = frame_timer.GetFrameTimingText(),
