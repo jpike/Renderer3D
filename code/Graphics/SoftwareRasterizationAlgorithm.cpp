@@ -90,26 +90,14 @@ namespace GRAPHICS
         for (const auto& local_triangle : object_3D.Triangles)
         {
             // TRANSFORM THE TRIANGLE INTO WORLD SPACE.
-            Triangle world_space_triangle = local_triangle;
-            std::size_t triangle_vertex_count = world_space_triangle.Vertices.size();
-            for (std::size_t vertex_index = 0; vertex_index < triangle_vertex_count; ++vertex_index)
-            {
-                // TRANFORM THE CURRENT LOCAL VERTEX INTO WORLD SPACE.
-                const MATH::Vector3f& local_vertex = local_triangle.Vertices[vertex_index];
-                MATH::Vector4f local_homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(local_vertex);
+            Triangle world_space_triangle = TransformLocalToWorld(local_triangle, object_world_transform);
 
-                /// @todo   More unit testing!
-                MATH::Vector4f world_homogeneous_vertex = object_world_transform * local_homogeneous_vertex;
-                MATH::Vector3f& world_vertex = world_space_triangle.Vertices[vertex_index];
-                world_vertex = MATH::Vector3f(world_homogeneous_vertex.X, world_homogeneous_vertex.Y, world_homogeneous_vertex.Z);
-            }
-
-            /// @todo   Clipping against camera z-boundaries!
-
-            /// @todo   Surface normal!
+            // CULL BACKFACES IF APPLICABLE.
             MATH::Vector3f unit_surface_normal = world_space_triangle.SurfaceNormal();
             if (cull_backfaces)
             {
+                // If the surface normal is facing opposite of the camera's view direction (negative dot product),
+                // then the surface normal should be facing the camera.
                 MATH::Vector3f view_direction = -camera.CoordinateFrame.Forward;
                 float surface_normal_camera_view_direction_dot_product = MATH::Vector3f::DotProduct(unit_surface_normal, view_direction);
                 bool triangle_facing_toward_camera = (surface_normal_camera_view_direction_dot_product < 0.0f);
@@ -120,38 +108,13 @@ namespace GRAPHICS
             }
 
             // TRANSFORM THE TRIANGLE FOR PROPER CAMERA VIEWING.
-            /// @todo   Combine this with previous loop?
-            bool triangle_within_near_far_clip_planes = true;
-            ScreenSpaceTriangle screen_space_triangle = 
-            {
-                .Material = world_space_triangle.Material,
-                .VertexPositions = world_space_triangle.Vertices,
-                .VertexColors = {}
-            };
-            for (std::size_t vertex_index = 0; vertex_index < triangle_vertex_count; ++vertex_index)
-            {
-                const MATH::Vector3f& world_vertex = world_space_triangle.Vertices[vertex_index];
-                MATH::Vector4f world_homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(world_vertex);
-
-                MATH::Vector4f view_vertex = camera_view_transform * world_homogeneous_vertex;
-
-                float near_z_boundary = -camera.NearClipPlaneViewDistance;
-                float far_z_boundary = -camera.FarClipPlaneViewDistance;
-                // "Direction" of >= comparisons is reversed due to being along negative Z axis.
-                bool current_vertex_within_near_far_clip_planes = (near_z_boundary >= view_vertex.Z && view_vertex.Z >= far_z_boundary);
-                triangle_within_near_far_clip_planes = triangle_within_near_far_clip_planes && current_vertex_within_near_far_clip_planes;
-
-                MATH::Vector4f projected_vertex = camera_projection_transform * view_vertex;
-
-                // The vertex must be de-homogenized.
-                /// @todo   absolute value may only need to be taken into account for x and y, not z.
-                MATH::Vector4f transformed_vertex = MATH::Vector4f::Scale(1.0f / projected_vertex.W, projected_vertex);
-
-                MATH::Vector4f screen_space_vertex = screen_transform * transformed_vertex;
-                screen_space_triangle.VertexPositions[vertex_index] = MATH::Vector3f(screen_space_vertex.X, screen_space_vertex.Y, screen_space_vertex.Z);
-            }
-
-            if (!triangle_within_near_far_clip_planes)
+            std::optional<ScreenSpaceTriangle> screen_space_triangle = TransformWorldToScreen(
+                world_space_triangle,
+                camera,
+                camera_view_transform,
+                camera_projection_transform,
+                screen_transform);
+            if (!screen_space_triangle)
             {
                 continue;
             }
@@ -159,54 +122,54 @@ namespace GRAPHICS
             /// @todo   Render screen-space triangle!
             lights;
 
-            switch (screen_space_triangle.Material->Shading)
+            switch (screen_space_triangle->Material->Shading)
             {
                 case ShadingType::WIREFRAME:
-                    screen_space_triangle.VertexColors =
+                    screen_space_triangle->VertexColors =
                     {
-                        screen_space_triangle.Material->WireframeColor,
-                        screen_space_triangle.Material->WireframeColor,
-                        screen_space_triangle.Material->WireframeColor,
+                        screen_space_triangle->Material->WireframeColor,
+                        screen_space_triangle->Material->WireframeColor,
+                        screen_space_triangle->Material->WireframeColor,
                     };
                     break;
                 case ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION:
-                    screen_space_triangle.VertexColors =
+                    screen_space_triangle->VertexColors =
                     {
-                        screen_space_triangle.Material->VertexWireframeColors[0],
-                        screen_space_triangle.Material->VertexWireframeColors[1],
-                        screen_space_triangle.Material->VertexWireframeColors[2],
+                        screen_space_triangle->Material->VertexWireframeColors[0],
+                        screen_space_triangle->Material->VertexWireframeColors[1],
+                        screen_space_triangle->Material->VertexWireframeColors[2],
                     };
                     break;
                 case ShadingType::FLAT:
-                    screen_space_triangle.VertexColors =
+                    screen_space_triangle->VertexColors =
                     {
-                        screen_space_triangle.Material->FaceColor,
-                        screen_space_triangle.Material->FaceColor,
-                        screen_space_triangle.Material->FaceColor,
+                        screen_space_triangle->Material->FaceColor,
+                        screen_space_triangle->Material->FaceColor,
+                        screen_space_triangle->Material->FaceColor,
                     };
                     break;
                 case ShadingType::FACE_VERTEX_COLOR_INTERPOLATION:
-                    screen_space_triangle.VertexColors =
+                    screen_space_triangle->VertexColors =
                     {
-                        screen_space_triangle.Material->VertexFaceColors[0],
-                        screen_space_triangle.Material->VertexFaceColors[1],
-                        screen_space_triangle.Material->VertexFaceColors[2],
+                        screen_space_triangle->Material->VertexFaceColors[0],
+                        screen_space_triangle->Material->VertexFaceColors[1],
+                        screen_space_triangle->Material->VertexFaceColors[2],
                     };
                     break;
                 case ShadingType::GOURAUD:
-                    screen_space_triangle.VertexColors =
+                    screen_space_triangle->VertexColors =
                     {
-                        screen_space_triangle.Material->VertexColors[0],
-                        screen_space_triangle.Material->VertexColors[1],
-                        screen_space_triangle.Material->VertexColors[2],
+                        screen_space_triangle->Material->VertexColors[0],
+                        screen_space_triangle->Material->VertexColors[1],
+                        screen_space_triangle->Material->VertexColors[2],
                     };
                     break;
                 case ShadingType::TEXTURED:
-                    screen_space_triangle.VertexColors =
+                    screen_space_triangle->VertexColors =
                     {
-                        screen_space_triangle.Material->VertexColors[0],
-                        screen_space_triangle.Material->VertexColors[1],
-                        screen_space_triangle.Material->VertexColors[2],
+                        screen_space_triangle->Material->VertexColors[0],
+                        screen_space_triangle->Material->VertexColors[1],
+                        screen_space_triangle->Material->VertexColors[2],
                     };
                     break;
                 case ShadingType::MATERIAL:
@@ -214,8 +177,93 @@ namespace GRAPHICS
                     break;
             }
 
-            Render(screen_space_triangle, output_bitmap);
+            Render(*screen_space_triangle, output_bitmap);
         }
+    }
+
+    /// Transforms a triangle from local coordinates to world coordinates.
+    /// @param[in]  local_triangle - The local triangle to transform.
+    /// @param[in]  world_transform - The world transformation for the triangle.
+    /// @return The world space triangle.
+    Triangle SoftwareRasterizationAlgorithm::TransformLocalToWorld(const Triangle& local_triangle, const MATH::Matrix4x4f& world_transform)
+    {
+        // TRANSFORM EACH VERTEX OF THE TRIANGLE.
+        Triangle world_space_triangle = local_triangle;
+
+        std::size_t triangle_vertex_count = world_space_triangle.Vertices.size();
+        for (std::size_t vertex_index = 0; vertex_index < triangle_vertex_count; ++vertex_index)
+        {
+            // TRANFORM THE CURRENT LOCAL VERTEX INTO WORLD SPACE.
+            const MATH::Vector3f& local_vertex = local_triangle.Vertices[vertex_index];
+            MATH::Vector4f local_homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(local_vertex);
+
+            MATH::Vector4f world_homogeneous_vertex = world_transform * local_homogeneous_vertex;
+            MATH::Vector3f& world_vertex = world_space_triangle.Vertices[vertex_index];
+            world_vertex = MATH::Vector3f(world_homogeneous_vertex.X, world_homogeneous_vertex.Y, world_homogeneous_vertex.Z);
+        }
+
+        return world_space_triangle;
+    }
+
+    /// @todo   Rethink this method...Maybe encapsulate in viewing pipeline?
+    /// Transforms a triangle from world space to screen space.
+    /// @param[in]  world_triangle - The world triangle to transform.
+    /// @param[in]  camera - The camera.
+    /// @param[in]  camera_view_transform - The camera's view transform.
+    /// @param[in]  camera_projection_transform - The camera's projection transform.
+    /// @param[in]  screen_transform - The screen transform.
+    /// @return The screen-space triangle, if within view; null otherwise.
+    std::optional<ScreenSpaceTriangle> SoftwareRasterizationAlgorithm::TransformWorldToScreen(
+        const Triangle& world_triangle,
+        const Camera& camera,
+        const MATH::Matrix4x4f& camera_view_transform,
+        const MATH::Matrix4x4f& camera_projection_transform,
+        const MATH::Matrix4x4f& screen_transform)
+    {
+        // CREATE THE INITIAL SCREEN SPACE TRIANGLE.
+        // Vertex colors will be populated later.
+        ScreenSpaceTriangle screen_space_triangle =
+        {
+            .Material = world_triangle.Material,
+            .VertexPositions = world_triangle.Vertices,
+            .VertexColors = {}
+        };
+
+        // TRANSFORM EACH VERTEX.
+        std::size_t triangle_vertex_count = world_triangle.Vertices.size();
+        for (std::size_t vertex_index = 0; vertex_index < triangle_vertex_count; ++vertex_index)
+        {
+            // TRANSFORM THE WORLD VERTEX INTO VIEW OF THE CAMERA.
+            const MATH::Vector3f& world_vertex = world_triangle.Vertices[vertex_index];
+            MATH::Vector4f world_homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(world_vertex);
+            MATH::Vector4f view_vertex = camera_view_transform * world_homogeneous_vertex;
+
+            // MAKE SURE THE VERTEX FALLS WITHIN CLIP PLANES.
+            // If not, we could get some odd projections (divide by zero, flipping, etc.) for triangles behind the camera.
+            // This also saves on rendering budgets for triangles out-of-view.
+            float near_z_boundary = -camera.NearClipPlaneViewDistance;
+            float far_z_boundary = -camera.FarClipPlaneViewDistance;
+            // "Direction" of >= comparisons is reversed due to being along negative Z axis.
+            bool current_vertex_within_near_far_clip_planes = (near_z_boundary >= view_vertex.Z && view_vertex.Z >= far_z_boundary);
+            if (!current_vertex_within_near_far_clip_planes)
+            {
+                // The triangle falls outside of the clipping range.
+                return std::nullopt;
+            }
+
+            // PROJECT THE VERTEX.
+            MATH::Vector4f projected_vertex = camera_projection_transform * view_vertex;
+            // The vertex must be de-homogenized.
+            MATH::Vector4f transformed_vertex = MATH::Vector4f::Scale(1.0f / projected_vertex.W, projected_vertex);
+
+            // TRANSFORM THE VERTEX INTO SCREEN SPACE.
+            MATH::Vector4f screen_space_vertex = screen_transform * transformed_vertex;
+            screen_space_triangle.VertexPositions[vertex_index] = MATH::Vector3f(screen_space_vertex.X, screen_space_vertex.Y, screen_space_vertex.Z);
+        }
+
+        // RETURN THE SCREEN SPACE TRIANGLE.
+        // If we didn't already return early above, then the triangle should be visible on screen.
+        return screen_space_triangle;
     }
 
     /// Renders a single triangle to the render target.

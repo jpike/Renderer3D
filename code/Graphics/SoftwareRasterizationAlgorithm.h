@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 #include "Graphics/Bitmap.h"
 #include "Graphics/Camera.h"
@@ -18,6 +19,14 @@ namespace GRAPHICS
 
         static void Render(const Scene& scene, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap);
         static void Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap);
+
+        static Triangle TransformLocalToWorld(const Triangle& local_triangle, const MATH::Matrix4x4f& world_transform);
+        static std::optional<ScreenSpaceTriangle> TransformWorldToScreen(
+            const Triangle& world_triangle,
+            const Camera& camera,
+            const MATH::Matrix4x4f& camera_view_transform,
+            const MATH::Matrix4x4f& camera_projection_transform,
+            const MATH::Matrix4x4f& screen_transform);
 
         static void Render(const ScreenSpaceTriangle& triangle, Bitmap& render_target);
 
