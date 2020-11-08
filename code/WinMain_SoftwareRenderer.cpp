@@ -34,7 +34,7 @@ static std::array<std::shared_ptr<GRAPHICS::Material>, static_cast<std::size_t>(
 static std::size_t g_current_material_index = 0;
 
 static MATH::Vector3<bool> g_rotation_enabled;
-static bool g_backface_culling = true;
+static bool g_backface_culling = false;
 
 GRAPHICS::Scene CreateScene(const std::size_t scene_index)
 {
@@ -176,7 +176,7 @@ LRESULT CALLBACK MainWindowCallback(
             /// @todo   GetKeyState vs GetAsyncKeyState()?
             bool shift_down = GetAsyncKeyState(VK_SHIFT) & 0x8000;
 
-            constexpr float CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS = 0.1f;
+            constexpr float CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS = 1.0f;
             constexpr float CAMERA_ROTATE_DEGREES_PER_KEY_PRESS = 1.0f;
             int virtual_key_code = static_cast<int>(w_param);
             // https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
@@ -386,7 +386,7 @@ int CALLBACK WinMain(
 
     g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
     g_camera.NearClipPlaneViewDistance = 1.0f;
-    g_camera.FarClipPlaneViewDistance = 500.0f;
+    g_camera.FarClipPlaneViewDistance = 100.0f;
 
 #if OLD_TRIANGLE
     std::shared_ptr<GRAPHICS::Material> material = std::make_shared<GRAPHICS::Material>();

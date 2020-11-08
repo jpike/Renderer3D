@@ -1,4 +1,6 @@
+#include <cassert>
 #include "Graphics/SoftwareRasterizationAlgorithm.h"
+#include "Math/Number.h"
 
 namespace GRAPHICS
 {
@@ -133,8 +135,8 @@ namespace GRAPHICS
 
                 MATH::Vector4f view_vertex = camera_view_transform * world_homogeneous_vertex;
 
-                float near_z_boundary = camera.WorldPosition.Z - camera.NearClipPlaneViewDistance;
-                float far_z_boundary = camera.WorldPosition.Z - camera.FarClipPlaneViewDistance;
+                float near_z_boundary = -camera.NearClipPlaneViewDistance;
+                float far_z_boundary = -camera.FarClipPlaneViewDistance;
                 // "Direction" of >= comparisons is reversed due to being along negative Z axis.
                 bool current_vertex_within_near_far_clip_planes = (near_z_boundary >= view_vertex.Z && view_vertex.Z >= far_z_boundary);
                 triangle_within_near_far_clip_planes = triangle_within_near_far_clip_planes && current_vertex_within_near_far_clip_planes;
@@ -323,11 +325,22 @@ namespace GRAPHICS
                 float min_y = std::min({ first_vertex.Y, second_vertex.Y, third_vertex.Y });
                 float max_y = std::max({ first_vertex.Y, second_vertex.Y, third_vertex.Y });
 
+                // Endpoints are clamped to avoid trying to draw really huge lines off-screen.
+                constexpr float MIN_BITMAP_COORDINATE = 1.0f;
+
+                float max_x_position = static_cast<float>(render_target.GetWidthInPixels() - 1);
+                float clamped_min_x = MATH::Number::Clamp<float>(min_x, MIN_BITMAP_COORDINATE, max_x_position);
+                float clamped_max_x = MATH::Number::Clamp<float>(max_x, MIN_BITMAP_COORDINATE, max_x_position);
+
+                float max_y_position = static_cast<float>(render_target.GetHeightInPixels() - 1);
+                float clamped_min_y = MATH::Number::Clamp<float>(min_y, MIN_BITMAP_COORDINATE, max_y_position);
+                float clamped_max_y = MATH::Number::Clamp<float>(max_y, MIN_BITMAP_COORDINATE, max_y_position);
+
                 // COLOR PIXELS WITHIN THE TRIANGLE.
                 constexpr float ONE_PIXEL = 1.0f;
-                for (float y = min_y; y <= max_y; y += ONE_PIXEL)
+                for (float y = clamped_min_y; y <= clamped_max_y; y += ONE_PIXEL)
                 {
-                    for (float x = min_x; x <= max_x; x += ONE_PIXEL)
+                    for (float x = clamped_min_x; x <= clamped_max_x; x += ONE_PIXEL)
                     {
                         // COMPUTE THE BARYCENTRIC COORDINATES OF THE CURRENT PIXEL POSITION.
                         // The following diagram shows the order of the vertices:
@@ -413,11 +426,22 @@ namespace GRAPHICS
                 float min_y = std::min({ first_vertex.Y, second_vertex.Y, third_vertex.Y });
                 float max_y = std::max({ first_vertex.Y, second_vertex.Y, third_vertex.Y });
 
+                // Endpoints are clamped to avoid trying to draw really huge lines off-screen.
+                constexpr float MIN_BITMAP_COORDINATE = 1.0f;
+
+                float max_x_position = static_cast<float>(render_target.GetWidthInPixels() - 1);
+                float clamped_min_x = MATH::Number::Clamp<float>(min_x, MIN_BITMAP_COORDINATE, max_x_position);
+                float clamped_max_x = MATH::Number::Clamp<float>(max_x, MIN_BITMAP_COORDINATE, max_x_position);
+
+                float max_y_position = static_cast<float>(render_target.GetHeightInPixels() - 1);
+                float clamped_min_y = MATH::Number::Clamp<float>(min_y, MIN_BITMAP_COORDINATE, max_y_position);
+                float clamped_max_y = MATH::Number::Clamp<float>(max_y, MIN_BITMAP_COORDINATE, max_y_position);
+
                 // COLOR PIXELS WITHIN THE TRIANGLE.
                 constexpr float ONE_PIXEL = 1.0f;
-                for (float y = min_y; y <= max_y; y += ONE_PIXEL)
+                for (float y = clamped_min_y; y <= clamped_max_y; y += ONE_PIXEL)
                 {
-                    for (float x = min_x; x <= max_x; x += ONE_PIXEL)
+                    for (float x = clamped_min_x; x <= clamped_max_x; x += ONE_PIXEL)
                     {
                         // COMPUTE THE BARYCENTRIC COORDINATES OF THE CURRENT PIXEL POSITION.
                         // The following diagram shows the order of the vertices:
@@ -559,22 +583,28 @@ namespace GRAPHICS
         const Color& color,
         Bitmap& render_target)
     {
+        // CLAMP ENDPOINTS TO AVOID TRYING TO DRAW REALLY HUGE LINES OFF-SCREEN.
+        constexpr float MIN_BITMAP_COORDINATE = 1.0f;
+
+        float max_x_position = static_cast<float>(render_target.GetWidthInPixels() - 1);
+        float clamped_start_x = MATH::Number::Clamp<float>(start_x, MIN_BITMAP_COORDINATE, max_x_position);
+        float clamped_end_x = MATH::Number::Clamp<float>(end_x, MIN_BITMAP_COORDINATE, max_x_position);
+
+        float max_y_position = static_cast<float>(render_target.GetHeightInPixels() - 1);
+        float clamped_start_y = MATH::Number::Clamp<float>(start_y, MIN_BITMAP_COORDINATE, max_y_position);
+        float clamped_end_y = MATH::Number::Clamp<float>(end_y, MIN_BITMAP_COORDINATE, max_y_position);
+
         // COMPUTE THE INCREMENTS ALONG EACH AXIS FOR EACH PIXEL.
-        // Each time we draw a pixel, we need to move slightly
-        // further along the axes.
-        float delta_x = end_x - start_x;
-        float delta_y = end_y - start_y;
+        // Each time we draw a pixel, we need to move slightly further along the axes.
+        float delta_x = clamped_end_x - clamped_start_x;
+        float delta_y = clamped_end_y - clamped_start_y;
         float length = std::max(std::abs(delta_x), std::abs(delta_y));
         float x_increment = delta_x / length;
         float y_increment = delta_y / length;
 
         // HAVE THE LINE START BEING DRAWN AT THE STARTING COORDINATES.
-        float x = start_x;
-        float y = start_y;
-
-        // GET THE MAXIMUM POSSIBLE POSITION VALUES.
-        float max_x_position = static_cast<float>(render_target.GetWidthInPixels() - 1);
-        float max_y_position = static_cast<float>(render_target.GetHeightInPixels() - 1);
+        float x = clamped_start_x;
+        float y = clamped_start_y;
 
         // DRAW PIXELS FOR THE LINE.
         for (float pixel_index = 0.0f; pixel_index <= length; ++pixel_index)
@@ -627,26 +657,33 @@ namespace GRAPHICS
         const Color& end_color,
         Bitmap& render_target)
     {
+        // CLAMP ENDPOINTS TO AVOID TRYING TO DRAW REALLY HUGE LINES OFF-SCREEN.
+        constexpr float MIN_BITMAP_COORDINATE = 1.0f;
+
+        float max_x_position = static_cast<float>(render_target.GetWidthInPixels() - 1);
+        float clamped_start_x = MATH::Number::Clamp<float>(start_x, MIN_BITMAP_COORDINATE, max_x_position);
+        float clamped_end_x = MATH::Number::Clamp<float>(end_x, MIN_BITMAP_COORDINATE, max_x_position);
+
+        float max_y_position = static_cast<float>(render_target.GetHeightInPixels() - 1);
+        float clamped_start_y = MATH::Number::Clamp<float>(start_y, MIN_BITMAP_COORDINATE, max_y_position);
+        float clamped_end_y = MATH::Number::Clamp<float>(end_y, MIN_BITMAP_COORDINATE, max_y_position);
+
         // COMPUTE THE LENGTH OF THE ENTIRE LINE.
-        MATH::Vector2f vector_from_start_to_end(end_x - start_x, end_y - start_y);
+        MATH::Vector2f vector_from_start_to_end(clamped_end_x - clamped_start_x, clamped_end_y - clamped_start_y);
         float line_length = vector_from_start_to_end.Length();
 
         // COMPUTE THE INCREMENTS ALONG EACH AXIS FOR EACH PIXEL.
         // Each time we draw a pixel, we need to move slightly
         // further along the axes.
-        float delta_x = end_x - start_x;
-        float delta_y = end_y - start_y;
+        float delta_x = clamped_end_x - clamped_start_x;
+        float delta_y = clamped_end_y - clamped_start_y;
         float length = std::max(std::abs(delta_x), std::abs(delta_y));
         float x_increment = delta_x / length;
         float y_increment = delta_y / length;
 
         // HAVE THE LINE START BEING DRAWN AT THE STARTING COORDINATES.
-        float x = start_x;
-        float y = start_y;
-
-        // GET THE MAXIMUM POSSIBLE POSITION VALUES.
-        float max_x_position = static_cast<float>(render_target.GetWidthInPixels() - 1);
-        float max_y_position = static_cast<float>(render_target.GetHeightInPixels() - 1);
+        float x = clamped_start_x;
+        float y = clamped_start_y;
 
         // DRAW PIXELS FOR THE LINE.
         for (float pixel_index = 0.0f; pixel_index <= length; ++pixel_index)
