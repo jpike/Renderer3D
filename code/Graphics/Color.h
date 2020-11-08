@@ -31,6 +31,7 @@ namespace GRAPHICS
         static Color ScaleRedGreenBlue(const float scale_factor, const Color& color);
         static Color ComponentMultiplyRedGreenBlue(const Color& color_1, const Color& color_2);
         static Color InterpolateRedGreenBlue(const Color& start_color, const Color& end_color, float ratio_toward_end);
+        explicit Color() = default;
         explicit Color(
             const float red,
             const float green,
@@ -66,13 +67,13 @@ namespace GRAPHICS
 
         // PUBLIC MEMBER VARIABLES FOR EASY ACCESS.
         /// The red component of the color.
-        float Red;
+        float Red = 0.0f;
         /// The blue component of the color.
-        float Blue;
+        float Blue = 0.0f;
         /// The green component of the color.
-        float Green;
+        float Green = 0.0f;
         /// The alpha component of the color.
-        float Alpha;
+        float Alpha = 1.0f;
 
     private:
         // HELPER METHODS.

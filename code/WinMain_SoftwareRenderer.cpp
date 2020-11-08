@@ -9,9 +9,11 @@
 #include <vector>
 #include <Windows.h>
 #include "Graphics/Camera.h"
+#include "Graphics/Cube.h"
 #include "Graphics/FrameTimer.h"
 #include "Graphics/Gui/Font.h"
 #include "Graphics/Gui/Text.h"
+#include "Graphics/Modeling/WavefrontObjectModel.h"
 #include "Graphics/Object3D.h"
 #include "Graphics/Scene.h"
 #include "Graphics/SoftwareRasterizationAlgorithm.h"
@@ -22,9 +24,116 @@
 // Global to provide access to them within the window procedure.
 /// The window for the application.
 static std::unique_ptr<WINDOWING::Win32Window> g_window = nullptr;
+
 static GRAPHICS::Camera g_camera;
-static MATH::Vector3<bool> g_rotation_enabled;
+
+static std::size_t g_scene_index = 0;
 static GRAPHICS::Scene g_scene;
+
+static std::array<std::shared_ptr<GRAPHICS::Material>, static_cast<std::size_t>(GRAPHICS::ShadingType::COUNT)> g_materials_by_shading_type;
+static std::size_t g_current_material_index = 0;
+
+static MATH::Vector3<bool> g_rotation_enabled;
+static bool g_backface_culling = true;
+
+GRAPHICS::Scene CreateScene(const std::size_t scene_index)
+{
+    switch (scene_index)
+    {
+        case 0:
+        {
+            // BASIC WHITE TRIANGLE.
+            OutputDebugString("\nBasic white triangle");
+            std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            GRAPHICS::Object3D triangle_object;
+            triangle_object.Triangles =
+            {
+                GRAPHICS::Triangle(
+                    material,
+                    {
+                        MATH::Vector3f(0.0f, 1.0f, 0.0f),
+                        MATH::Vector3f(-1.0f, -1.0f, 0.0f),
+                        MATH::Vector3f(1.0f, -1.0f, 0.0f)
+                    })
+            };
+            GRAPHICS::Scene scene;
+            scene.Objects.push_back(triangle_object);
+            return scene;
+        }
+        case 1:
+        {
+            // OLDER BASIC TRIANGLE.
+            OutputDebugString("\nOld basic triangle");
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            GRAPHICS::Triangle triangle = GRAPHICS::Triangle::CreateEquilateral(material);
+            GRAPHICS::Object3D larger_triangle;
+            larger_triangle.Triangles = { triangle };
+            //constexpr float LARGER_TRIANGLE_SCALE = 50.0f;
+            //larger_triangle.Scale = MATH::Vector3f(LARGER_TRIANGLE_SCALE, LARGER_TRIANGLE_SCALE, 1.0f);
+            larger_triangle.WorldPosition = MATH::Vector3f(0.0f, 0.0f, 0.0f);
+            GRAPHICS::Scene scene;
+            scene.Objects.push_back(larger_triangle);
+            return scene;
+        }
+        case 2:
+        {
+            // MANY SMALL TRIANGLES.
+            OutputDebugString("\nMany small triangles");
+            constexpr std::size_t SMALL_TRIANGLE_COUNT = 50;
+            std::random_device random_number_generator;
+            GRAPHICS::Scene scene;
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            GRAPHICS::Triangle triangle = GRAPHICS::Triangle::CreateEquilateral(material);
+            while (scene.Objects.size() < SMALL_TRIANGLE_COUNT)
+            {
+                GRAPHICS::Object3D current_object_3D;
+                current_object_3D.Triangles = { triangle };
+                //constexpr float OBJECT_SCALE = 30.0f;
+                //current_object_3D.Scale = MATH::Vector3f(OBJECT_SCALE, OBJECT_SCALE, OBJECT_SCALE);
+                float x_position = static_cast<float>(random_number_generator() % 16) - 8.0f;
+                float y_position = static_cast<float>(random_number_generator() % 16) - 8.0f;
+                current_object_3D.WorldPosition = MATH::Vector3f(x_position, y_position, -8.0f);
+                scene.Objects.push_back(current_object_3D);
+            }
+            return scene;
+        }
+        case 3:
+        {
+            OutputDebugString("\nCube");
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            GRAPHICS::Object3D cube = GRAPHICS::Cube::Create(material);
+            //cube.Scale = MATH::Vector3f(10.0f, 10.0f, 10.0f);
+            cube.WorldPosition = MATH::Vector3f(0.0f, 0.0f, -2.0f);
+
+            GRAPHICS::Scene scene;
+            scene.Objects.push_back(cube);
+            return scene;
+        }
+        case 4:
+        {
+            OutputDebugString("\nCube from file");
+            GRAPHICS::Scene scene;
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            std::optional<GRAPHICS::Object3D> cube_from_file = GRAPHICS::MODELING::WavefrontObjectModel::Load("../assets/default_cube.obj");
+            if (cube_from_file)
+            {
+                /// @todo   Need to support proper material loading.
+#if 1
+                for (auto& loaded_triangle : cube_from_file->Triangles)
+                {
+                    loaded_triangle.Material = material;
+                }
+#endif
+                cube_from_file->WorldPosition = MATH::Vector3f(0.0f, 0.0f, -2.0f);
+                scene.Objects.push_back(*cube_from_file);
+            }
+
+            return scene;
+        }
+        default:
+            return g_scene;
+    }
+}
 
 /// The main window callback procedure for processing messages sent to the main application window.
 /// @param[in]  window - Handle to the window.
@@ -150,14 +259,36 @@ LRESULT CALLBACK MainWindowCallback(
                 }
                 case 0x42: // B
                 {
+                    g_backface_culling = !g_backface_culling;
+                    std::string backface_culling_message = "\nBackface culling: " + std::to_string(g_backface_culling);
+                    OutputDebugString(backface_culling_message.c_str());
                     break;
                 };
                 case 0x53: // S
                 {
+                    constexpr std::size_t MAX_SCENE_COUNT = 5;
+                    ++g_scene_index;
+                    g_scene_index = g_scene_index % MAX_SCENE_COUNT;
+                    OutputDebugString(("\nScene index: " + std::to_string(g_scene_index)).c_str());
+                    g_scene = CreateScene(g_scene_index);
                     break;
                 };
                 case 0x4D: // M
                 {
+                    // SWITCH TO THE NEXT MATERIAL FOR ALL OBJECTS.
+                    ++g_current_material_index;
+                    g_current_material_index = g_current_material_index % static_cast<std::size_t>(GRAPHICS::ShadingType::COUNT);
+
+                    OutputDebugString(("\nMaterial index: " + std::to_string(g_current_material_index)).c_str());
+
+                    const std::shared_ptr<GRAPHICS::Material>& current_material = g_materials_by_shading_type.at(g_current_material_index);
+                    for (auto& object_3D : g_scene.Objects)
+                    {
+                        for (auto& triangle : object_3D.Triangles)
+                        {
+                            triangle.Material = current_material;
+                        }
+                    }
                     break;
                 };
                 case 0x4C: // L
@@ -257,6 +388,7 @@ int CALLBACK WinMain(
     g_camera.NearClipPlaneViewDistance = 1.0f;
     g_camera.FarClipPlaneViewDistance = 500.0f;
 
+#if OLD_TRIANGLE
     std::shared_ptr<GRAPHICS::Material> material = std::make_shared<GRAPHICS::Material>();
     material->Shading = GRAPHICS::ShadingType::WIREFRAME;
     material->WireframeColor = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f);
@@ -272,6 +404,91 @@ int CALLBACK WinMain(
             })
     };
     g_scene.Objects.push_back(triangle_object);
+#endif
+    // LOAD A TEXTURE FOR TESTING.
+    std::shared_ptr<GRAPHICS::Bitmap> texture = GRAPHICS::Bitmap::Load("../assets/test_texture1.bmp");
+    if (!texture)
+    {
+        OutputDebugString("Failed to load test texture.");
+        return EXIT_FAILURE;
+    }
+
+    // DEFINE A VARIETY OF MATERIALS.
+    // These can't be initialized statically since some of the color constants are also static,
+    // and initialization order isn't clearly defined.
+    g_materials_by_shading_type =
+    {
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::WIREFRAME,
+            .WireframeColor = GRAPHICS::Color::GREEN
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION,
+            .VertexWireframeColors =
+            {
+                GRAPHICS::Color::RED,
+                GRAPHICS::Color::GREEN,
+                GRAPHICS::Color::BLUE,
+            }
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::FLAT,
+            .FaceColor = GRAPHICS::Color::BLUE
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::FACE_VERTEX_COLOR_INTERPOLATION,
+            .VertexFaceColors =
+            {
+                GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f),
+                GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f),
+                GRAPHICS::Color(0.0f, 0.0f, 1.0f, 1.0f),
+            }
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::GOURAUD,
+            .VertexColors =
+            {
+                // Basic grayscale.
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+            },
+            .SpecularPower = 20.0f
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            .Shading = GRAPHICS::ShadingType::TEXTURED,
+            .VertexColors =
+            {
+                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+                GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            },
+            .Texture = texture,
+            .VertexTextureCoordinates =
+            {
+                MATH::Vector2f(0.0f, 0.0f),
+                MATH::Vector2f(1.0f, 0.0f),
+                MATH::Vector2f(0.0f, 1.0f)
+            }
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+                /// @todo   Make this get values directly from the "material".
+                .Shading = GRAPHICS::ShadingType::MATERIAL,
+                .AmbientColor = GRAPHICS::Color(0.2f, 0.2f, 0.2f, 1.0f),
+                .DiffuseColor = GRAPHICS::Color(0.8f, 0.8f, 0.8f, 1.0f),
+            })
+    };
+
+    g_scene_index = 0;
+    g_current_material_index = 3;
+    g_scene = CreateScene(g_scene_index);
 
     // RUN A MESSAGE LOOP.
     float object_rotation_angle_in_radians = 0.0f;
@@ -343,10 +560,10 @@ int CALLBACK WinMain(
         // RENDER THE 3D SCENE.
         g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
         g_scene.BackgroundColor = GRAPHICS::Color::RED;
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, perspective_projected_drawing);
+        GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, perspective_projected_drawing);
         g_camera.Projection = GRAPHICS::ProjectionType::ORTHOGRAPHIC;
         g_scene.BackgroundColor = GRAPHICS::Color::BLUE;
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, orthographic_projected_drawing);
+        GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, orthographic_projected_drawing);
 
         // RENDER DEBUG TEXT.
         debug_text_drawing.FillPixels(GRAPHICS::Color::BLACK);

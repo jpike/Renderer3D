@@ -45,8 +45,9 @@ namespace GRAPHICS
     /// Renders an entire 3D scene.
     /// @param[in]  scene - The scene to render.
     /// @param[in]  camera - The camera to use to view the scene.
+    /// @param[in]  cull_backfaces - True if backfaces should be culled; false otherwise.
     /// @param[in,out]  output_bitmap - The bitmap to render to.
-    void SoftwareRasterizationAlgorithm::Render(const Scene& scene, const Camera& camera, Bitmap& output_bitmap)
+    void SoftwareRasterizationAlgorithm::Render(const Scene& scene, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap)
     {
         // CLEAR THE BACKGROUND.
         output_bitmap.FillPixels(scene.BackgroundColor);
@@ -54,7 +55,7 @@ namespace GRAPHICS
         // RENDER EACH OBJECT IN THE SCENE.
         for (const auto& object_3D : scene.Objects)
         {
-            Render(object_3D, scene.PointLights, camera, output_bitmap);
+            Render(object_3D, scene.PointLights, camera, cull_backfaces, output_bitmap);
         }
     }
 
@@ -63,7 +64,7 @@ namespace GRAPHICS
     /// @param[in]  lights - Any lights that should illuminate the object.
     /// @param[in]  camera - The camera to use to view the object.
     /// @param[in,out]  output_bitmap - The bitmap to render to.
-    void SoftwareRasterizationAlgorithm::Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, Bitmap& output_bitmap)
+    void SoftwareRasterizationAlgorithm::Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap)
     {
         // GET RE-USED TRANSFORMATION MATRICES.
         // This is done before the loop to avoid performance hits for repeatedly calculating these matrices.
@@ -105,18 +106,26 @@ namespace GRAPHICS
 
             /// @todo   Surface normal!
             MATH::Vector3f unit_surface_normal = world_space_triangle.SurfaceNormal();
-            MATH::Vector3f view_direction = -camera.CoordinateFrame.Forward;
-            float surface_normal_camera_view_direction_dot_product = MATH::Vector3f::DotProduct(unit_surface_normal, view_direction);
-            bool triangle_facing_toward_camera = (surface_normal_camera_view_direction_dot_product < 0.0f);
-            if (!triangle_facing_toward_camera)
+            if (cull_backfaces)
             {
-                continue;
+                MATH::Vector3f view_direction = -camera.CoordinateFrame.Forward;
+                float surface_normal_camera_view_direction_dot_product = MATH::Vector3f::DotProduct(unit_surface_normal, view_direction);
+                bool triangle_facing_toward_camera = (surface_normal_camera_view_direction_dot_product < 0.0f);
+                if (!triangle_facing_toward_camera)
+                {
+                    continue;
+                }
             }
 
             // TRANSFORM THE TRIANGLE FOR PROPER CAMERA VIEWING.
             /// @todo   Combine this with previous loop?
             bool triangle_within_near_far_clip_planes = true;
-            Triangle screen_space_triangle = world_space_triangle;
+            ScreenSpaceTriangle screen_space_triangle = 
+            {
+                .Material = world_space_triangle.Material,
+                .VertexPositions = world_space_triangle.Vertices,
+                .VertexColors = {}
+            };
             for (std::size_t vertex_index = 0; vertex_index < triangle_vertex_count; ++vertex_index)
             {
                 const MATH::Vector3f& world_vertex = world_space_triangle.Vertices[vertex_index];
@@ -126,7 +135,7 @@ namespace GRAPHICS
 
                 float near_z_boundary = camera.WorldPosition.Z - camera.NearClipPlaneViewDistance;
                 float far_z_boundary = camera.WorldPosition.Z - camera.FarClipPlaneViewDistance;
-                // "Direction" of <= comparisons is reversed due to being along negative Z axis.
+                // "Direction" of >= comparisons is reversed due to being along negative Z axis.
                 bool current_vertex_within_near_far_clip_planes = (near_z_boundary >= view_vertex.Z && view_vertex.Z >= far_z_boundary);
                 triangle_within_near_far_clip_planes = triangle_within_near_far_clip_planes && current_vertex_within_near_far_clip_planes;
 
@@ -137,7 +146,7 @@ namespace GRAPHICS
                 MATH::Vector4f transformed_vertex = MATH::Vector4f::Scale(1.0f / projected_vertex.W, projected_vertex);
 
                 MATH::Vector4f screen_space_vertex = screen_transform * transformed_vertex;
-                screen_space_triangle.Vertices[vertex_index] = MATH::Vector3f(screen_space_vertex.X, screen_space_vertex.Y, screen_space_vertex.Z);
+                screen_space_triangle.VertexPositions[vertex_index] = MATH::Vector3f(screen_space_vertex.X, screen_space_vertex.Y, screen_space_vertex.Z);
             }
 
             if (!triangle_within_near_far_clip_planes)
@@ -148,29 +157,75 @@ namespace GRAPHICS
             /// @todo   Render screen-space triangle!
             lights;
 
-            std::array<Color, Triangle::VERTEX_COUNT> triangle_vertex_colors =
+            switch (screen_space_triangle.Material->Shading)
             {
-                screen_space_triangle.Material->WireframeColor,
-                screen_space_triangle.Material->WireframeColor,
-                screen_space_triangle.Material->WireframeColor,
-            };
+                case ShadingType::WIREFRAME:
+                    screen_space_triangle.VertexColors =
+                    {
+                        screen_space_triangle.Material->WireframeColor,
+                        screen_space_triangle.Material->WireframeColor,
+                        screen_space_triangle.Material->WireframeColor,
+                    };
+                    break;
+                case ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION:
+                    screen_space_triangle.VertexColors =
+                    {
+                        screen_space_triangle.Material->VertexWireframeColors[0],
+                        screen_space_triangle.Material->VertexWireframeColors[1],
+                        screen_space_triangle.Material->VertexWireframeColors[2],
+                    };
+                    break;
+                case ShadingType::FLAT:
+                    screen_space_triangle.VertexColors =
+                    {
+                        screen_space_triangle.Material->FaceColor,
+                        screen_space_triangle.Material->FaceColor,
+                        screen_space_triangle.Material->FaceColor,
+                    };
+                    break;
+                case ShadingType::FACE_VERTEX_COLOR_INTERPOLATION:
+                    screen_space_triangle.VertexColors =
+                    {
+                        screen_space_triangle.Material->VertexFaceColors[0],
+                        screen_space_triangle.Material->VertexFaceColors[1],
+                        screen_space_triangle.Material->VertexFaceColors[2],
+                    };
+                    break;
+                case ShadingType::GOURAUD:
+                    screen_space_triangle.VertexColors =
+                    {
+                        screen_space_triangle.Material->VertexColors[0],
+                        screen_space_triangle.Material->VertexColors[1],
+                        screen_space_triangle.Material->VertexColors[2],
+                    };
+                    break;
+                case ShadingType::TEXTURED:
+                    screen_space_triangle.VertexColors =
+                    {
+                        screen_space_triangle.Material->VertexColors[0],
+                        screen_space_triangle.Material->VertexColors[1],
+                        screen_space_triangle.Material->VertexColors[2],
+                    };
+                    break;
+                case ShadingType::MATERIAL:
+                    /// @todo
+                    break;
+            }
 
-            /// @todo   Collapse triangle + vertex colors into single data type?
-            Render(screen_space_triangle, triangle_vertex_colors, output_bitmap);
+            Render(screen_space_triangle, output_bitmap);
         }
     }
 
     /// Renders a single triangle to the render target.
-    /// @param[in]  triangle - The triangle to render (in screen-space coordinates).
-    /// @param[in]  triangle_vertex_colors - The vertex colors of the triangle.
+    /// @param[in]  triangle - The triangle to render.
     /// @param[in,out]  render_target - The target to render to.
-    void SoftwareRasterizationAlgorithm::Render(const Triangle& triangle, const std::array<GRAPHICS::Color, Triangle::VERTEX_COUNT>& triangle_vertex_colors, Bitmap& render_target)
+    void SoftwareRasterizationAlgorithm::Render(const ScreenSpaceTriangle& triangle, Bitmap& render_target)
     {
         // GET THE VERTICES.
         // They're needed for all kinds of shading.
-        const MATH::Vector3f& first_vertex = triangle.Vertices[0];
-        const MATH::Vector3f& second_vertex = triangle.Vertices[1];
-        const MATH::Vector3f& third_vertex = triangle.Vertices[2];
+        const MATH::Vector3f& first_vertex = triangle.VertexPositions[0];
+        const MATH::Vector3f& second_vertex = triangle.VertexPositions[1];
+        const MATH::Vector3f& third_vertex = triangle.VertexPositions[2];
 
         // RENDER THE TRIANGLE BASED ON SHADING TYPE.
         switch (triangle.Material->Shading)
@@ -179,7 +234,7 @@ namespace GRAPHICS
             {
                 // GET THE COLOR.
                 /// @todo   Assuming all vertices have the same color here.
-                Color wireframe_color = triangle_vertex_colors[0];
+                Color wireframe_color = triangle.VertexColors[0];
 
                 // DRAW THE FIRST EDGE.
                 DrawLine(
@@ -212,9 +267,9 @@ namespace GRAPHICS
             case ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION:
             {
                 // GET THE VERTEX COLORS.
-                Color vertex_0_wireframe_color = triangle_vertex_colors[0];
-                Color vertex_1_wireframe_color = triangle_vertex_colors[1];
-                Color vertex_2_wireframe_color = triangle_vertex_colors[2];
+                Color vertex_0_wireframe_color = triangle.VertexColors[0];
+                Color vertex_1_wireframe_color = triangle.VertexColors[1];
+                Color vertex_2_wireframe_color = triangle.VertexColors[2];
 
                 // DRAW THE FIRST EDGE.
                 DrawLineWithInterpolatedColor(
@@ -320,7 +375,7 @@ namespace GRAPHICS
                         {
                             // GET THE COLOR.
                             /// @todo   Assuming all vertices have the same color here.
-                            Color face_color = triangle_vertex_colors[0];
+                            Color face_color = triangle.VertexColors[0];
 
                             // DRAW THE COLORED PIXEL.
                             // The coordinates need to be rounded to integer in order
@@ -411,9 +466,9 @@ namespace GRAPHICS
                             // The color needs to be interpolated with this kind of shading.
                             Color interpolated_color = GRAPHICS::Color::BLACK;
 
-                            const Color& first_vertex_color = triangle_vertex_colors[0];
-                            const Color& second_vertex_color = triangle_vertex_colors[1];
-                            const Color& third_vertex_color = triangle_vertex_colors[2];
+                            const Color& first_vertex_color = triangle.VertexColors[0];
+                            const Color& second_vertex_color = triangle.VertexColors[1];
+                            const Color& third_vertex_color = triangle.VertexColors[2];
                             interpolated_color.Red = (
                                 (scaled_signed_distance_of_current_pixel_relative_to_right_edge * third_vertex_color.Red) +
                                 (scaled_signed_distance_of_current_pixel_relative_to_left_edge * second_vertex_color.Red) +

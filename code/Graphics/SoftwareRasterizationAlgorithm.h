@@ -6,6 +6,7 @@
 #include "Graphics/Gui/Text.h"
 #include "Graphics/Light.h"
 #include "Graphics/Scene.h"
+#include "Graphics/ScreenSpaceTriangle.h"
 
 namespace GRAPHICS
 {
@@ -15,10 +16,10 @@ namespace GRAPHICS
     {
         static void Render(const GUI::Text& text, Bitmap& render_target);
 
-        static void Render(const Scene& scene, const Camera& camera, Bitmap& output_bitmap);
-        static void Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, Bitmap& output_bitmap);
+        static void Render(const Scene& scene, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap);
+        static void Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap);
 
-        static void Render(const Triangle& triangle, const std::array<GRAPHICS::Color, Triangle::VERTEX_COUNT>& triangle_vertex_colors, Bitmap& render_target);
+        static void Render(const ScreenSpaceTriangle& triangle, Bitmap& render_target);
 
         static void DrawLine(
             const float start_x,
