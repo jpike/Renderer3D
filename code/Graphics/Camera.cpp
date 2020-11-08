@@ -82,9 +82,8 @@ namespace GRAPHICS
         // Ensures that points on the near and far z planes are left alone in terms of the z coordinate.
         perspective_matrix.Elements(2, 2) = near_z_world_boundary + far_z_world_boundary;
         perspective_matrix.Elements(3, 2) = -far_z_world_boundary * near_z_world_boundary;
-        // Helps preserve the z coordinate.  Since we're looking down the negative z-axis,
-        // the sign is negated so that the perspective divide doesn't flip the x/y coordinates.
-        perspective_matrix.Elements(2, 3) = -1.0f;
+        // Helps preserve the z coordinate.
+        perspective_matrix.Elements(2, 3) = 1.0f;
 
         // CREATE THE ORTHOGRAPHIC MATRIX.
         // The tangent function requires the field of view in radians.
@@ -186,11 +185,10 @@ namespace GRAPHICS
         // CREATE THE ORTHOGRAPHIC MATRIX.
         // This is needed regardless of the type of projection transform.
 
-        // Since the camera looks down the negative Z axis, the distances should be subtracted
-        // from the camera's world position to form the viewing boundaries.
-        /// @todo   Does this need to take into account the orientation of the camera?
-        float near_z_world_boundary = WorldPosition.Z - NearClipPlaneViewDistance;
-        float far_z_world_boundary = WorldPosition.Z - FarClipPlaneViewDistance;
+        // Since the camera looks down the negative Z axis, the distances should be negated
+        // to form the viewing boundaries.
+        float near_z_world_boundary = -NearClipPlaneViewDistance;
+        float far_z_world_boundary = -FarClipPlaneViewDistance;
 
         // The tangent function requires the field of view in radians.
         MATH::Angle<float>::Radians field_of_view_in_radians = MATH::Angle<float>::DegreesToRadians(FieldOfView);
@@ -217,14 +215,20 @@ namespace GRAPHICS
         bool is_perspective = (ProjectionType::PERSPECTIVE == Projection);
         if (is_perspective)
         {
-            // USE A PERSPECTIVE MATRIX.
-            /// @todo   Reduce duplication of orthographic matrix computation!
-            MATH::Matrix4x4f perspective_matrix = PerspectiveProjection(
-                FieldOfView,
-                1.0f,
-                near_z_world_boundary,
-                far_z_world_boundary);
-            return perspective_matrix;
+            // CREATE THE BASIC PERSPECTIVE MATRIX.
+            MATH::Matrix4x4f perspective_matrix;
+            // Multiples the x/y coordinates by the near z world boundary so that the x/y coordinates
+            // can be properly scaled relative to the near plane and the corresponding z coordinate.
+            perspective_matrix.Elements(0, 0) = near_z_world_boundary;
+            perspective_matrix.Elements(1, 1) = near_z_world_boundary;
+            // Ensures that points on the near and far z planes are left alone in terms of the z coordinate.
+            perspective_matrix.Elements(2, 2) = near_z_world_boundary + far_z_world_boundary;
+            perspective_matrix.Elements(3, 2) = -far_z_world_boundary * near_z_world_boundary;
+            // Helps preserve the z coordinate.
+            perspective_matrix.Elements(2, 3) = 1.0f;
+            // COMPUTE THE FULL PERSPECTIVE PROJECTION MATRIX.
+            MATH::Matrix4x4f perspective_projection_matrix = orthographic_matrix * perspective_matrix;
+            return perspective_projection_matrix;
         }
         else
         {
