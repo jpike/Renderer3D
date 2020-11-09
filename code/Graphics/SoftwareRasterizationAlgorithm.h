@@ -28,6 +28,13 @@ namespace GRAPHICS
             const MATH::Matrix4x4f& camera_projection_transform,
             const MATH::Matrix4x4f& screen_transform);
 
+        static Color ComputeLighting(
+            const MATH::Vector3f& world_vertex,
+            const MATH::Vector3f& unit_vertex_normal,
+            const Material& material,
+            const Camera& camera,
+            const std::vector<Light>& lights);
+
         static void Render(const ScreenSpaceTriangle& triangle, Bitmap& render_target);
 
         static void DrawLine(

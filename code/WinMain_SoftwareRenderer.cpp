@@ -18,6 +18,7 @@
 #include "Graphics/Scene.h"
 #include "Graphics/SoftwareRasterizationAlgorithm.h"
 #include "Graphics/Triangle.h"
+#include "InputControl/Key.h"
 #include "Windowing/Win32Window.h"
 
 // GLOBALS.
@@ -33,6 +34,185 @@ static GRAPHICS::Scene g_scene;
 
 static std::array<std::shared_ptr<GRAPHICS::Material>, static_cast<std::size_t>(GRAPHICS::ShadingType::COUNT)> g_materials_by_shading_type;
 static std::size_t g_current_material_index = 0;
+
+static std::vector< std::vector<GRAPHICS::Light> > g_light_configurations =
+{
+    // Full white ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+        },
+    },
+    // Half strength ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f)
+        },
+    },
+    // Pitch-black ambient lighting.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(0.0f, 0.0f, 0.0f, 1.0f)
+        },
+    },
+    // Red ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f)
+        },
+    },
+    // Green ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f)
+        },
+    },
+    // Blue ambient light.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::AMBIENT,
+            .Color = GRAPHICS::Color(0.0f, 0.0f, 1.0f, 1.0f)
+        },
+    },
+    // White directional light going left.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f(-1.0f, 0.0f, 0.0f)
+        },
+    },
+    // White directional light going right.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f(1.0f, 0.0f, 0.0f)
+        },
+    },
+    // White directional light going down.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f(0.0f, -1.0f, 0.0f)
+        },
+    },
+    // White directional light going up.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f(0.0f, 1.0f, 0.0f)
+        },
+    },
+    // Red directional light at an angle.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f::Normalize(MATH::Vector3f(1.0f, 1.0f, 0.0f))
+        },
+    },
+    // Green directional light at an angle.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f::Normalize(MATH::Vector3f(0.0f, 1.0f, 1.0f))
+        },
+    },
+    // Blue directional light at an angle.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::DIRECTIONAL,
+            .Color = GRAPHICS::Color(0.0f, 0.0f, 1.0f, 1.0f),
+            .DirectionalLightDirection = MATH::Vector3f::Normalize(MATH::Vector3f(1.0f, 0.0f, 1.0f))
+        },
+    },
+    // White point light at center.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 1.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(0.0f, 0.0f, 0.0f)
+        },
+    },
+    // Red-green light at left.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(1.0f, 1.0f, 0.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(-50.0f, 0.0f, 0.0f)
+        },
+    },
+    // Green-blue light at right.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(0.0f, 1.0f, 1.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(50.0f, 0.0f, 0.0f)
+        },
+    },
+    // Blue-red light at top.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(1.0f, 0.0f, 1.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(0.0f, 50.0f, 0.0f)
+        },
+    },
+    // Green-blue light at bottom.
+    std::vector<GRAPHICS::Light>
+    {
+        GRAPHICS::Light
+        {
+            .Type = GRAPHICS::LightType::POINT,
+            .Color = GRAPHICS::Color(0.0f, 1.0f, 1.0f, 1.0f),
+            .PointLightWorldPosition = MATH::Vector3f(0.0f, -50.0f, 0.0f)
+        },
+    },
+};
+static std::size_t g_current_light_index = 0;
 
 static MATH::Vector3<bool> g_rotation_enabled;
 static bool g_backface_culling = false;
@@ -183,19 +363,19 @@ LRESULT CALLBACK MainWindowCallback(
             // https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
             switch (virtual_key_code)
             {
-                case VK_UP:
+                case INPUT_CONTROL::Key::UP_ARROW:
                     g_camera.WorldPosition.Y += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
                     break;
-                case VK_DOWN:
+                case INPUT_CONTROL::Key::DOWN_ARROW:
                     g_camera.WorldPosition.Y -= CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
                     break;
-                case VK_LEFT:
+                case INPUT_CONTROL::Key::LEFT_ARROW:
                     g_camera.WorldPosition.X -= CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
                     break;
-                case VK_RIGHT:
+                case INPUT_CONTROL::Key::RIGHT_ARROW:
                     g_camera.WorldPosition.X += CAMERA_MOVEMENT_DISTANCE_PER_KEY_PRESS;
                     break;
-                case 0x44: // D (depth)
+                case INPUT_CONTROL::Key::D: // D (depth)
                 {
                     if (shift_down)
                     {
@@ -207,7 +387,7 @@ LRESULT CALLBACK MainWindowCallback(
                     }
                     break;
                 }
-                case 0x4E: // N
+                case INPUT_CONTROL::Key::N:
                 {
                     if (shift_down)
                     {
@@ -219,7 +399,7 @@ LRESULT CALLBACK MainWindowCallback(
                     }
                     break;
                 }
-                case 0x46: // F
+                case INPUT_CONTROL::Key::F:
                 {
                     if (shift_down)
                     {
@@ -231,7 +411,7 @@ LRESULT CALLBACK MainWindowCallback(
                     }
                     break;
                 }
-                case 0x56: // V
+                case INPUT_CONTROL::Key::V:
                 {
                     if (shift_down)
                     {
@@ -243,27 +423,27 @@ LRESULT CALLBACK MainWindowCallback(
                     }
                     break;
                 }
-                case 0x58: // X
+                case INPUT_CONTROL::Key::X:
                 {
                     g_rotation_enabled.X = !g_rotation_enabled.X;
                     break;
                 }
-                case 0x59: // Y
+                case INPUT_CONTROL::Key::Y: // Y
                 {
                     g_rotation_enabled.Y = !g_rotation_enabled.Y;
                     break;
                 }
-                case 0x5A: // Z
+                case INPUT_CONTROL::Key::Z:
                 {
                     g_rotation_enabled.Z = !g_rotation_enabled.Z;
                     break;
                 }
-                case 0x42: // B
+                case INPUT_CONTROL::Key::B:
                 {
                     g_backface_culling = !g_backface_culling;
                     break;
                 };
-                case 0x53: // S
+                case INPUT_CONTROL::Key::S:
                 {
                     constexpr std::size_t MAX_SCENE_COUNT = 5;
                     ++g_scene_index;
@@ -271,7 +451,7 @@ LRESULT CALLBACK MainWindowCallback(
                     g_scene = CreateScene(g_scene_index);
                     break;
                 };
-                case 0x4D: // M
+                case INPUT_CONTROL::Key::M:
                 {
                     // SWITCH TO THE NEXT MATERIAL FOR ALL OBJECTS.
                     ++g_current_material_index;
@@ -287,8 +467,12 @@ LRESULT CALLBACK MainWindowCallback(
                     }
                     break;
                 };
-                case 0x4C: // L
+                case INPUT_CONTROL::Key::L:
                 {
+                    // SWITCH TO THE NEXT LIGHTING CONFIGURATION.
+                    ++g_current_light_index;
+                    g_current_light_index = g_current_light_index % g_light_configurations.size();
+                    g_scene.PointLights = g_light_configurations[g_current_light_index];
                     break;
                 };
                 default:
@@ -400,12 +584,12 @@ int CALLBACK WinMain(
         std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
         {
             .Shading = GRAPHICS::ShadingType::WIREFRAME,
-            .WireframeColor = GRAPHICS::Color::GREEN
+            .VertexColors = { GRAPHICS::Color::GREEN, GRAPHICS::Color::GREEN, GRAPHICS::Color::GREEN }
         }),
         std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
         {
             .Shading = GRAPHICS::ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION,
-            .VertexWireframeColors =
+            .VertexColors =
             {
                 GRAPHICS::Color::RED,
                 GRAPHICS::Color::GREEN,
@@ -415,12 +599,12 @@ int CALLBACK WinMain(
         std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
         {
             .Shading = GRAPHICS::ShadingType::FLAT,
-            .FaceColor = GRAPHICS::Color::BLUE
+            .VertexColors = { GRAPHICS::Color::BLUE, GRAPHICS::Color::BLUE, GRAPHICS::Color::BLUE }
         }),
         std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
         {
             .Shading = GRAPHICS::ShadingType::FACE_VERTEX_COLOR_INTERPOLATION,
-            .VertexFaceColors =
+            .VertexColors =
             {
                 GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f),
                 GRAPHICS::Color(0.0f, 1.0f, 0.0f, 1.0f),
@@ -458,10 +642,16 @@ int CALLBACK WinMain(
         }),
         std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
         {
-                /// @todo   Make this get values directly from the "material".
-                .Shading = GRAPHICS::ShadingType::MATERIAL,
-                .AmbientColor = GRAPHICS::Color(0.2f, 0.2f, 0.2f, 1.0f),
-                .DiffuseColor = GRAPHICS::Color(0.8f, 0.8f, 0.8f, 1.0f),
+            /// @todo   Make this get values directly from the "material".
+            .Shading = GRAPHICS::ShadingType::MATERIAL,
+            .VertexColors = 
+            {
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+            },
+            .AmbientColor = GRAPHICS::Color(0.2f, 0.2f, 0.2f, 1.0f),
+            .DiffuseColor = GRAPHICS::Color(0.8f, 0.8f, 0.8f, 1.0f),
         })
     };
 
@@ -585,6 +775,15 @@ int CALLBACK WinMain(
             .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
         };
         GRAPHICS::SoftwareRasterizationAlgorithm::Render(material_text, debug_text_drawing);
+
+        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
+        GRAPHICS::GUI::Text lighting_text =
+        {
+            .String = "Lighting: " + std::to_string(g_current_light_index),
+            .Font = font.get(),
+            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
+        };
+        GRAPHICS::SoftwareRasterizationAlgorithm::Render(lighting_text, debug_text_drawing);
 
         debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
         GRAPHICS::GUI::Text frame_timing_text =
