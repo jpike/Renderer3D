@@ -12,9 +12,9 @@ namespace GRAPHICS
     public:
         // STATIC CONSTANTS.
         /// The default minimum depth value for the depth buffer.
-        static constexpr float MIN_DEPTH = std::numeric_limits<float>::min();
+        static constexpr float MIN_DEPTH = std::numeric_limits<float>::max();
         /// The default maximum depth value for the depth buffer.
-        static constexpr float MAX_DEPTH = std::numeric_limits<float>::max();
+        static constexpr float MAX_DEPTH = std::numeric_limits<float>::lowest();
 
         // CONSTRUCTION/DESTRUCTION.
         explicit DepthBuffer(const unsigned int width_in_pixels, const unsigned int height_in_pixels);

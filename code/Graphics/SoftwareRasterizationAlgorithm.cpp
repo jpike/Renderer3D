@@ -508,7 +508,7 @@ namespace GRAPHICS
                             if (depth_buffer)
                             {
                                 float current_pixel_depth = depth_buffer->GetDepth(current_pixel_x, current_pixel_y);
-                                bool current_pixel_in_front_of_old_pixels = (interpolated_z <= current_pixel_depth);
+                                bool current_pixel_in_front_of_old_pixels = (interpolated_z >= current_pixel_depth);
                                 if (!current_pixel_in_front_of_old_pixels)
                                 {
                                     // Continue to the next iteration of the loop in
@@ -607,7 +607,7 @@ namespace GRAPHICS
             if (depth_buffer)
             {
                 float current_pixel_depth = depth_buffer->GetDepth(current_pixel_x, current_pixel_y);
-                bool current_pixel_in_front_of_old_pixels = (z <= current_pixel_depth);
+                bool current_pixel_in_front_of_old_pixels = (z >= current_pixel_depth);
                 if (!current_pixel_in_front_of_old_pixels)
                 {
                     // Continue to the next iteration of the loop in
@@ -709,7 +709,7 @@ namespace GRAPHICS
             if (depth_buffer)
             {
                 float current_pixel_depth = depth_buffer->GetDepth(current_pixel_x, current_pixel_y);
-                bool current_pixel_in_front_of_old_pixels = (z <= current_pixel_depth);
+                bool current_pixel_in_front_of_old_pixels = (z >= current_pixel_depth);
                 if (!current_pixel_in_front_of_old_pixels)
                 {
                     // Continue to the next iteration of the loop in
