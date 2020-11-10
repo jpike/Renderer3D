@@ -31,9 +31,9 @@ namespace GRAPHICS
             Triangle(material, {vertices[6], vertices[7], vertices[4]}),
             Triangle(material, {vertices[5], vertices[6], vertices[4]}),
             Triangle(material, {vertices[2], vertices[6], vertices[1]}),
-            Triangle(material, {vertices[5], vertices[6], vertices[1]}),
+            Triangle(material, {vertices[5], vertices[1], vertices[6]}),
             Triangle(material, {vertices[7], vertices[6], vertices[3]}),
-            Triangle(material, {vertices[2], vertices[6], vertices[3]}),
+            Triangle(material, {vertices[2], vertices[3], vertices[6]}),
             Triangle(material, {vertices[5], vertices[4], vertices[0]}),
             Triangle(material, {vertices[1], vertices[5], vertices[0]}),
         };

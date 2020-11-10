@@ -15,7 +15,6 @@
 #include "Graphics/OpenGL/OpenGL.h"
 #include "Graphics/OpenGL/OpenGLRenderer.h"
 #include "Graphics/RayTracing/RayTracingAlgorithm.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/Scene.h"
 #include "Graphics/Triangle.h"
 #include "Windowing/Win32Window.h"
@@ -44,7 +43,7 @@ static std::size_t g_current_material_index = 0;
 /// The type of renderer currently being used.
 static RendererType g_current_renderer_type = RendererType::SOFTWARE_RASTERIZER;
 /// The software rasterizer.
-static std::unique_ptr<GRAPHICS::Renderer> g_software_rasterizer = nullptr;
+/// @todo static std::unique_ptr<GRAPHICS::Renderer> g_software_rasterizer = nullptr;
 static std::unique_ptr<GRAPHICS::Bitmap> g_software_render_target = nullptr;
 /// The ray tracer.
 static std::unique_ptr<GRAPHICS::RAY_TRACING::RayTracingAlgorithm> g_ray_tracer = nullptr;
@@ -496,10 +495,12 @@ LRESULT CALLBACK MainWindowCallback(
                     bool software_rasterizer_already_being_used = (RendererType::SOFTWARE_RASTERIZER == g_current_renderer_type);
                     if (!software_rasterizer_already_being_used)
                     {
+#if TODO
                         if (!g_software_rasterizer)
                         {
                             g_software_rasterizer = std::make_unique<GRAPHICS::Renderer>();
                         }
+#endif
 
                         if (!g_software_render_target)
                         {
@@ -659,10 +660,12 @@ int CALLBACK WinMain(
     }
 
     // INITIALIZE THE DEFAULT RENDERER.
+#if TODO
     if (!g_software_rasterizer)
     {
         g_software_rasterizer = std::make_unique<GRAPHICS::Renderer>();
     }
+#endif
     if (!g_software_render_target)
     {
         /// @todo   Centralize screen dimensions.
@@ -872,7 +875,9 @@ int CALLBACK WinMain(
             {
                 // RENDER THE SCENE.
                 //g_scene.BackgroundColor = GRAPHICS::Color(1.0f, 0.0f, 0.0f, 1.0f);
+#if TODO
                 g_software_rasterizer->Render(g_scene, g_camera, *g_software_render_target);
+#endif
 
                 // DISPLAY THE RENDERED OBJECTS IN THE WINDOW.
                 g_window->Display(*g_software_render_target);

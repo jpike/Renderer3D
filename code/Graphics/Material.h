@@ -11,11 +11,10 @@ namespace GRAPHICS
     /// The different kinds of shading that are supported.
     enum class ShadingType
     {
-        /// Objects are rendered as wireframes with a single color.
+        /// Objects are rendered as wireframes.
+        /// Colors will be interpolated across vertices.
         /// Defaults to wireframe to ensure at least something gets rendered.
         WIREFRAME = 0,
-        /// Objects are rendered as wireframes with colors interpolated across vertices.
-        WIREFRAME_VERTEX_COLOR_INTERPOLATION,
         /// Objects are rendered with a solid, flat color.
         FLAT,
         /// Objects are rendered with colors interpolated across vertices across the entire face.
@@ -39,26 +38,9 @@ namespace GRAPHICS
         /// The type of shading for the material.
         ShadingType Shading = ShadingType::WIREFRAME;
 
-        /// The color of an edge, if wireframe shading is used.
-        Color WireframeColor = Color::BLACK;
-
-        /// The colors of each of the vertices for use in wireframe shading.
+        /// The vertex colors for shading.
         /// Expected to be in counter-clockwise vertex order, and the number of vertex colors
         /// can vary to handle different kinds of polygonal shapes.
-        std::vector<Color> VertexWireframeColors = {};
-
-        /// The color of a face, if solid-color face (flat) shading is used.
-        Color FaceColor = Color::BLACK;
-
-        /// The colors of each of the vertices for use in interpolated face shading.
-        /// Expected to be in counter-clockwise vertex order, and the number of vertex colors
-        /// can vary to handle different kinds of polygonal shapes.
-        std::vector<Color> VertexFaceColors = {};
-
-        /// The vertex colors for Gouraud shading.
-        /// Expected to be in counter-clockwise vertex order, and the number of vertex colors
-        /// can vary to handle different kinds of polygonal shapes.
-        /// @todo   Consolidate these vertex colors with other vertex colors?
         std::vector<Color> VertexColors = {};
 
         /// The ambient color of the material.

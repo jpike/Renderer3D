@@ -19,6 +19,8 @@ namespace GRAPHICS
         static constexpr float MAX_FLOAT_COLOR_COMPONENT = 1.0f;
         /// The color black.
         static const Color BLACK;
+        /// The color white.
+        static const Color WHITE;
         /// The color red.
         static const Color RED;
         /// The color green.

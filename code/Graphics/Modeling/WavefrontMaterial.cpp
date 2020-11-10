@@ -185,13 +185,7 @@ namespace GRAPHICS::MODELING
                 line_data >> alpha;
                 /// @todo   Using this for the material color is just a hack for now.
                 /// Adding duplicates to handle triangles for some cases.
-                material->WireframeColor.Alpha = alpha;
-                material->FaceColor.Alpha = alpha;
-                for (auto& color : material->VertexFaceColors)
-                {
-                    color.Alpha = alpha;
-                }
-                for (auto& color : material->VertexWireframeColors)
+                for (auto& color : material->VertexColors)
                 {
                     color.Alpha = alpha;
                 }

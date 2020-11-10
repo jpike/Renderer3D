@@ -16,7 +16,7 @@ namespace GRAPHICS::OPEN_GL
 
         // SET LIGHTING IF APPROPRIATE.
         /// @todo   Better way to control lighting than presence/absence of light?
-        bool lighting_enabled = !scene.PointLights.empty();
+        bool lighting_enabled = bool(scene.PointLights);
         if (lighting_enabled)
         {
             // ENABLE LIGHTING.
@@ -26,7 +26,7 @@ namespace GRAPHICS::OPEN_GL
             // While lights only up to GL_LIGHT7 are explicitly defined,
             // more lights are actually supported, and the greater lights
             // can be specified by simple addition (http://docs.gl/gl2/glLight).
-            GLenum light_count = static_cast<GLenum>(scene.PointLights.size());
+            GLenum light_count = static_cast<GLenum>(scene.PointLights->size());
             GLenum max_light_index = std::min<GLenum>(light_count, GL_MAX_LIGHTS);
             for (GLenum light_index = 0; light_index < max_light_index; ++light_index)
             {
@@ -37,7 +37,7 @@ namespace GRAPHICS::OPEN_GL
                 glLightfv(light_id, GL_QUADRATIC_ATTENUATION, &LIGHT_ATTENUATION);
 
                 // SET PROPERTIES RELATED TO THE CURRENT TYPE OF LIGHT.
-                const Light& current_light = scene.PointLights[light_index];
+                const Light& current_light = (*scene.PointLights)[light_index];
                 float light_color[] = { current_light.Color.Red, current_light.Color.Green, current_light.Color.Blue, current_light.Color.Alpha };
                 const float NO_LIGHT_COLOR[] = { 0.0f, 0.0f, 0.0f, 1.0f };
                 switch (current_light.Type)
@@ -169,9 +169,7 @@ namespace GRAPHICS::OPEN_GL
             }
 
             // START RENDERING THE APPROPRIATE TYPE OF PRIMITIVE.
-            bool is_wireframe = (
-                ShadingType::WIREFRAME == triangle.Material->Shading ||
-                ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION == triangle.Material->Shading);
+            bool is_wireframe = (ShadingType::WIREFRAME == triangle.Material->Shading);
             if (is_wireframe)
             {
                 // RENDER LINES BETWEEN EACH VERTEX.
@@ -222,31 +220,22 @@ namespace GRAPHICS::OPEN_GL
                     case ShadingType::WIREFRAME:
                     {
                         glColor3f(
-                            triangle.Material->WireframeColor.Red,
-                            triangle.Material->WireframeColor.Green,
-                            triangle.Material->WireframeColor.Blue);
-                        break;
-                    }
-                    case ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION:
-                    {
-                        const Color& vertex_color = triangle.Material->VertexWireframeColors[vertex_index];
-                        glColor3f(
-                            vertex_color.Red,
-                            vertex_color.Green,
-                            vertex_color.Blue);
+                            triangle.Material->VertexColors[vertex_index].Red,
+                            triangle.Material->VertexColors[vertex_index].Green,
+                            triangle.Material->VertexColors[vertex_index].Blue);
                         break;
                     }
                     case ShadingType::FLAT:
                     {
                         glColor3f(
-                            triangle.Material->FaceColor.Red,
-                            triangle.Material->FaceColor.Green,
-                            triangle.Material->FaceColor.Blue);
+                            triangle.Material->VertexColors[vertex_index].Red,
+                            triangle.Material->VertexColors[vertex_index].Green,
+                            triangle.Material->VertexColors[vertex_index].Blue);
                         break;
                     }
                     case ShadingType::FACE_VERTEX_COLOR_INTERPOLATION:
                     {
-                        const Color& vertex_color = triangle.Material->VertexFaceColors[vertex_index];
+                        const Color& vertex_color = triangle.Material->VertexColors[vertex_index];
                         glColor3f(
                             vertex_color.Red,
                             vertex_color.Green,

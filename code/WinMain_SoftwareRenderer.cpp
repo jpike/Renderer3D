@@ -32,11 +32,49 @@ static std::size_t g_scene_index = 0;
 static std::string g_scene_title;
 static GRAPHICS::Scene g_scene;
 
-static std::array<std::shared_ptr<GRAPHICS::Material>, static_cast<std::size_t>(GRAPHICS::ShadingType::COUNT)> g_materials_by_shading_type;
+static std::vector<std::shared_ptr<GRAPHICS::Material>> g_materials;
 static std::size_t g_current_material_index = 0;
 
-static std::vector< std::vector<GRAPHICS::Light> > g_light_configurations =
+static std::vector<std::string> g_material_names =
 {
+    "Wireframe green",
+    "Wireframe RGB",
+    "Flat blue",
+    "Flat RGB",
+    "Gouraud gray",
+    "Textured white",
+    "Material (ambient, diffuse)",
+    "Material (ambient, diffuse, specular)",
+};
+
+static std::vector<std::string> g_light_configuration_names =
+{
+    "No lighting",
+    "Single white ambient light",
+    "Single gray ambient light",
+    "Pitch black ambient light",
+    "Red ambient light",
+    "Green ambient light",
+    "Blue ambient light",
+    "White directional light going left",
+    "White directional light going right",
+    "White directional light going down",
+    "White directional light going up",
+    "Red directional light at angle",
+    "Green directional light at angle",
+    "Blue directional light at angle",
+    "White point light at center",
+    "Red-green point light at left",
+    "Green-blue point light at right",
+    "Blue-red point light at top",
+    "Green-blue point light at bottom",
+};
+
+static std::vector< std::optional<std::vector<GRAPHICS::Light>> > g_light_configurations =
+{
+    // No lights,
+    std::nullopt,
+
     // Full white ambient light.
     std::vector<GRAPHICS::Light>
     {
@@ -225,7 +263,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
         {
             // BASIC WHITE TRIANGLE.
             g_scene_title = "Basic white triangle";
-            std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            std::shared_ptr<GRAPHICS::Material>& material = g_materials.at(g_current_material_index);
             GRAPHICS::Object3D triangle_object;
             triangle_object.Triangles =
             {
@@ -245,7 +283,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
         {
             // OLDER BASIC TRIANGLE.
             g_scene_title = "Old basic triangle";
-            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials.at(g_current_material_index);
             GRAPHICS::Triangle triangle = GRAPHICS::Triangle::CreateEquilateral(material);
             GRAPHICS::Object3D larger_triangle;
             larger_triangle.Triangles = { triangle };
@@ -263,7 +301,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
             constexpr std::size_t SMALL_TRIANGLE_COUNT = 50;
             std::random_device random_number_generator;
             GRAPHICS::Scene scene;
-            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials.at(g_current_material_index);
             GRAPHICS::Triangle triangle = GRAPHICS::Triangle::CreateEquilateral(material);
             while (scene.Objects.size() < SMALL_TRIANGLE_COUNT)
             {
@@ -281,7 +319,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
         case 3:
         {
             g_scene_title = "Cube";
-            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials.at(g_current_material_index);
             GRAPHICS::Object3D cube = GRAPHICS::Cube::Create(material);
             //cube.Scale = MATH::Vector3f(10.0f, 10.0f, 10.0f);
             cube.WorldPosition = MATH::Vector3f(0.0f, 0.0f, -2.0f);
@@ -294,7 +332,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
         {
             g_scene_title = "Cube from file";
             GRAPHICS::Scene scene;
-            const std::shared_ptr<GRAPHICS::Material>& material = g_materials_by_shading_type.at(g_current_material_index);
+            const std::shared_ptr<GRAPHICS::Material>& material = g_materials.at(g_current_material_index);
             std::optional<GRAPHICS::Object3D> cube_from_file = GRAPHICS::MODELING::WavefrontObjectModel::Load("../assets/default_cube.obj");
             if (cube_from_file)
             {
@@ -455,9 +493,9 @@ LRESULT CALLBACK MainWindowCallback(
                 {
                     // SWITCH TO THE NEXT MATERIAL FOR ALL OBJECTS.
                     ++g_current_material_index;
-                    g_current_material_index = g_current_material_index % static_cast<std::size_t>(GRAPHICS::ShadingType::COUNT);
+                    g_current_material_index = g_current_material_index % g_materials.size();
 
-                    const std::shared_ptr<GRAPHICS::Material>& current_material = g_materials_by_shading_type.at(g_current_material_index);
+                    const std::shared_ptr<GRAPHICS::Material>& current_material = g_materials.at(g_current_material_index);
                     for (auto& object_3D : g_scene.Objects)
                     {
                         for (auto& triangle : object_3D.Triangles)
@@ -579,7 +617,7 @@ int CALLBACK WinMain(
     // DEFINE A VARIETY OF MATERIALS.
     // These can't be initialized statically since some of the color constants are also static,
     // and initialization order isn't clearly defined.
-    g_materials_by_shading_type =
+    g_materials =
     {
         std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
         {
@@ -588,7 +626,7 @@ int CALLBACK WinMain(
         }),
         std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
         {
-            .Shading = GRAPHICS::ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION,
+            .Shading = GRAPHICS::ShadingType::WIREFRAME,
             .VertexColors =
             {
                 GRAPHICS::Color::RED,
@@ -652,7 +690,22 @@ int CALLBACK WinMain(
             },
             .AmbientColor = GRAPHICS::Color(0.2f, 0.2f, 0.2f, 1.0f),
             .DiffuseColor = GRAPHICS::Color(0.8f, 0.8f, 0.8f, 1.0f),
-        })
+        }),
+        std::make_shared<GRAPHICS::Material>(GRAPHICS::Material
+        {
+            /// @todo   Make this get values directly from the "material".
+            .Shading = GRAPHICS::ShadingType::MATERIAL,
+            .VertexColors =
+            {
+                GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
+                GRAPHICS::Color(0.0f, 0.0f, 0.0f, 1.0f),
+                GRAPHICS::Color(0.0f, 0.0f, 0.0f, 1.0f),
+            },
+            .AmbientColor = GRAPHICS::Color(0.2f, 0.2f, 0.2f, 1.0f),
+            .DiffuseColor = GRAPHICS::Color(0.8f, 0.8f, 0.8f, 1.0f),
+            .SpecularColor = GRAPHICS::Color(0.8f, 0.8f, 0.8f, 1.0f),
+            .SpecularPower = 16.0f,
+        }),
     };
 
     g_scene_index = 0;
@@ -728,10 +781,10 @@ int CALLBACK WinMain(
 
         // RENDER THE 3D SCENE.
         g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
-        g_scene.BackgroundColor = GRAPHICS::Color::RED;
+        g_scene.BackgroundColor = GRAPHICS::Color(0.1f, 0.1f, 0.1f, 1.0f);
         GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, perspective_projected_drawing);
         g_camera.Projection = GRAPHICS::ProjectionType::ORTHOGRAPHIC;
-        g_scene.BackgroundColor = GRAPHICS::Color::BLUE;
+        g_scene.BackgroundColor = GRAPHICS::Color(0.2f, 0.2f, 0.2f, 1.0f);
         GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, orthographic_projected_drawing);
 
         // RENDER DEBUG TEXT.
@@ -770,7 +823,7 @@ int CALLBACK WinMain(
         debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
         GRAPHICS::GUI::Text material_text =
         {
-            .String = "Material: " + std::to_string(g_current_material_index),
+            .String = "Material: " + std::to_string(g_current_material_index) + " " + g_material_names[g_current_material_index],
             .Font = font.get(),
             .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
         };
@@ -779,7 +832,7 @@ int CALLBACK WinMain(
         debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
         GRAPHICS::GUI::Text lighting_text =
         {
-            .String = "Lighting: " + std::to_string(g_current_light_index),
+            .String = "Lighting: " + std::to_string(g_current_light_index) + " " + g_light_configuration_names[g_current_light_index],
             .Font = font.get(),
             .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
         };

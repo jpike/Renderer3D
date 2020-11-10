@@ -72,13 +72,6 @@ namespace RAY_TRACING
                 {
                     // COMPUTE THE CURRENT PIXEL'S COLOR.
                     Color color = ComputeColor(scene_with_world_space_objects, *closest_intersection, ReflectionCount);
-
-                    /// @todo   Fix color hack.
-                    if (ShadingType::FLAT == closest_intersection->Triangle->Material->Shading)
-                    {
-                        color = closest_intersection->Triangle->Material->FaceColor;
-                    }
-
                     render_target.WritePixel(x, y, color);
                 }
                 else
@@ -116,7 +109,7 @@ namespace RAY_TRACING
         // COMPUTE SHADOWS.
         std::vector<float> shadow_factors_by_light_index;
         MATH::Vector3f intersection_point = intersection.IntersectionPoint();
-        for (const Light& light : scene.PointLights)
+        for (const Light& light : (*scene.PointLights))
         {
             // CAST A RAY OUT TO COMPUTE SHADOWS IF ENABLED.
             // To simplify later parts of the algorithm, a shadow factor of 1 (no shadowing)
@@ -163,7 +156,7 @@ namespace RAY_TRACING
         {
             // ADD DIFFUSE CONTRIBUTIONS FROM ALL LIGHT SOURCES.
             Color light_total_color = Color::BLACK;
-            for (std::size_t light_index = 0; light_index < scene.PointLights.size(); ++light_index)
+            for (std::size_t light_index = 0; light_index < scene.PointLights->size(); ++light_index)
             {
                 // ADD COLOR FROM THE CURRENT LIGHT.
                 // This is based on the Lambertian shading model.
@@ -171,7 +164,7 @@ namespace RAY_TRACING
                 // An object tangent to the light direction or facing away receives no illumination.
                 // In-between, the amount of illumination is proportional to the cosine of the angle between
                 // the light and surface normal (where the cosine can be computed via the dot product).
-                const Light& light = scene.PointLights.at(light_index);
+                const Light& light = scene.PointLights->at(light_index);
                 MATH::Vector3f direction_from_point_to_light = light.PointLightDirectionFrom(intersection_point);
                 MATH::Vector3f unit_direction_from_point_to_light = MATH::Vector3f::Normalize(direction_from_point_to_light);
                 constexpr float NO_ILLUMINATION = 0.0f;
@@ -200,10 +193,10 @@ namespace RAY_TRACING
             Color specular_light_total_color = Color::BLACK;
             MATH::Vector3f ray_from_intersection_to_eye = intersection.Ray->Origin - intersection_point;
             MATH::Vector3f normalized_ray_from_intersection_to_eye = MATH::Vector3f::Normalize(ray_from_intersection_to_eye);
-            for (std::size_t light_index = 0; light_index < scene.PointLights.size(); ++light_index)
+            for (std::size_t light_index = 0; light_index < scene.PointLights->size(); ++light_index)
             {
                 // COMPUTE THE AMOUNT OF ILLUMINATION FROM THE CURRENT LIGHT.
-                const Light& light = scene.PointLights.at(light_index);
+                const Light& light = scene.PointLights->at(light_index);
                 MATH::Vector3f direction_from_point_to_light = light.PointLightDirectionFrom(intersection_point);
                 MATH::Vector3f unit_direction_from_point_to_light = MATH::Vector3f::Normalize(direction_from_point_to_light);
                 constexpr float NO_ILLUMINATION = 0.0f;

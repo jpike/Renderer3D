@@ -1,8 +1,9 @@
 // To avoid annoyances with Windows min/max #defines.
 #define NOMINMAX
 
-#include <cassert>
+#include "Graphics/Shading.h"
 #include "Graphics/SoftwareRasterizationAlgorithm.h"
+#include "Graphics/ViewingTransformations.h"
 #include "Math/Number.h"
 
 namespace GRAPHICS
@@ -69,25 +70,12 @@ namespace GRAPHICS
     /// @param[in]  lights - Any lights that should illuminate the object.
     /// @param[in]  camera - The camera to use to view the object.
     /// @param[in,out]  output_bitmap - The bitmap to render to.
-    void SoftwareRasterizationAlgorithm::Render(const Object3D& object_3D, const std::vector<Light>& lights, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap)
+    void SoftwareRasterizationAlgorithm::Render(const Object3D& object_3D, const std::optional<std::vector<Light>>& lights, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap)
     {
-        // GET RE-USED TRANSFORMATION MATRICES.
+        // GET RE-USED TRANSFORMATIONS.
         // This is done before the loop to avoid performance hits for repeatedly calculating these matrices.
         MATH::Matrix4x4f object_world_transform = object_3D.WorldTransform();
-        MATH::Matrix4x4f camera_view_transform = camera.ViewTransform();
-
-        MATH::Matrix4x4f camera_projection_transform = camera.ProjectionTransform();
-
-        MATH::Matrix4x4f flip_y_transform = MATH::Matrix4x4f::Scale(MATH::Vector3f(1.0f, -1.0f, 1.0f));
-        MATH::Matrix4x4f scale_to_screen_transform = MATH::Matrix4x4f::Scale(MATH::Vector3f(
-            static_cast<float>(output_bitmap.GetWidthInPixels()) / 2.0f,
-            static_cast<float>(output_bitmap.GetHeightInPixels()) / 2.0f,
-            1.0f));
-        MATH::Matrix4x4f translate_to_screen_center_transform = MATH::Matrix4x4f::Translation(MATH::Vector3f(
-            static_cast<float>(output_bitmap.GetWidthInPixels()) / 2.0f,
-            static_cast<float>(output_bitmap.GetHeightInPixels()) / 2.0f,
-            0.0f));
-        MATH::Matrix4x4 screen_transform = translate_to_screen_center_transform * scale_to_screen_transform * flip_y_transform;
+        ViewingTransformations viewing_transformations(camera, output_bitmap);
 
         // RENDER EACH TRIANGLE OF THE OBJECT.
         for (const auto& local_triangle : object_3D.Triangles)
@@ -111,12 +99,7 @@ namespace GRAPHICS
             }
 
             // TRANSFORM THE TRIANGLE FOR PROPER CAMERA VIEWING.
-            std::optional<ScreenSpaceTriangle> screen_space_triangle = TransformWorldToScreen(
-                world_space_triangle,
-                camera,
-                camera_view_transform,
-                camera_projection_transform,
-                screen_transform);
+            std::optional<ScreenSpaceTriangle> screen_space_triangle = viewing_transformations.Apply(world_space_triangle);
             if (!screen_space_triangle)
             {
                 continue;
@@ -125,19 +108,18 @@ namespace GRAPHICS
             // COMPUTE VERTEX COLORS.
             for (std::size_t vertex_index = 0; vertex_index < Triangle::VERTEX_COUNT; ++vertex_index)
             {
-                // COMPUTE LIGHTING FOR THE VERTEX.
+                // SHADE THE CURRENT VERTEX.
                 const MATH::Vector3f& world_vertex = world_space_triangle.Vertices[vertex_index];
-                Color light_color = ComputeLighting(
+                const Color& base_vertex_color = screen_space_triangle->Material->VertexColors[vertex_index];
+
+                Color final_vertex_color = Shading::Compute(
                     world_vertex,
                     unit_surface_normal,
+                    base_vertex_color,
                     *screen_space_triangle->Material,
-                    camera,
+                    camera.WorldPosition,
                     lights);
 
-                // COMBINE LIGHTING WITH THE BASE VERTEX COLOR.
-                Color base_vertex_color = screen_space_triangle->Material->VertexColors[vertex_index];
-                Color final_vertex_color = Color::ComponentMultiplyRedGreenBlue(base_vertex_color, light_color);
-                final_vertex_color.Clamp();
                 screen_space_triangle->VertexColors[vertex_index] = final_vertex_color;
             }
 
@@ -170,168 +152,6 @@ namespace GRAPHICS
         return world_space_triangle;
     }
 
-    /// @todo   Rethink this method...Maybe encapsulate in viewing pipeline?
-    /// Transforms a triangle from world space to screen space.
-    /// @param[in]  world_triangle - The world triangle to transform.
-    /// @param[in]  camera - The camera.
-    /// @param[in]  camera_view_transform - The camera's view transform.
-    /// @param[in]  camera_projection_transform - The camera's projection transform.
-    /// @param[in]  screen_transform - The screen transform.
-    /// @return The screen-space triangle, if within view; null otherwise.
-    std::optional<ScreenSpaceTriangle> SoftwareRasterizationAlgorithm::TransformWorldToScreen(
-        const Triangle& world_triangle,
-        const Camera& camera,
-        const MATH::Matrix4x4f& camera_view_transform,
-        const MATH::Matrix4x4f& camera_projection_transform,
-        const MATH::Matrix4x4f& screen_transform)
-    {
-        // CREATE THE INITIAL SCREEN SPACE TRIANGLE.
-        // Vertex colors will be populated later.
-        ScreenSpaceTriangle screen_space_triangle =
-        {
-            .Material = world_triangle.Material,
-            .VertexPositions = world_triangle.Vertices,
-            .VertexColors = {}
-        };
-
-        // TRANSFORM EACH VERTEX.
-        std::size_t triangle_vertex_count = world_triangle.Vertices.size();
-        for (std::size_t vertex_index = 0; vertex_index < triangle_vertex_count; ++vertex_index)
-        {
-            // TRANSFORM THE WORLD VERTEX INTO VIEW OF THE CAMERA.
-            const MATH::Vector3f& world_vertex = world_triangle.Vertices[vertex_index];
-            MATH::Vector4f world_homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(world_vertex);
-            MATH::Vector4f view_vertex = camera_view_transform * world_homogeneous_vertex;
-
-            // MAKE SURE THE VERTEX FALLS WITHIN CLIP PLANES.
-            // If not, we could get some odd projections (divide by zero, flipping, etc.) for triangles behind the camera.
-            // This also saves on rendering budgets for triangles out-of-view.
-            float near_z_boundary = -camera.NearClipPlaneViewDistance;
-            float far_z_boundary = -camera.FarClipPlaneViewDistance;
-            // "Direction" of >= comparisons is reversed due to being along negative Z axis.
-            bool current_vertex_within_near_far_clip_planes = (near_z_boundary >= view_vertex.Z && view_vertex.Z >= far_z_boundary);
-            if (!current_vertex_within_near_far_clip_planes)
-            {
-                // The triangle falls outside of the clipping range.
-                return std::nullopt;
-            }
-
-            // PROJECT THE VERTEX.
-            MATH::Vector4f projected_vertex = camera_projection_transform * view_vertex;
-            // The vertex must be de-homogenized.
-            MATH::Vector4f transformed_vertex = MATH::Vector4f::Scale(1.0f / projected_vertex.W, projected_vertex);
-
-            // TRANSFORM THE VERTEX INTO SCREEN SPACE.
-            MATH::Vector4f screen_space_vertex = screen_transform * transformed_vertex;
-            screen_space_triangle.VertexPositions[vertex_index] = MATH::Vector3f(screen_space_vertex.X, screen_space_vertex.Y, screen_space_vertex.Z);
-        }
-
-        // RETURN THE SCREEN SPACE TRIANGLE.
-        // If we didn't already return early above, then the triangle should be visible on screen.
-        return screen_space_triangle;
-    }
-
-    /// Computes lighting for a vertex.
-    /// @param[in]  world_vertex - The world space vertex for which to compute lighting.
-    /// @param[in]  unit_vertex_normal - The unit surface normal for the vertex.
-    /// @param[in]  material - The material for the vertex.
-    /// @param[in]  camera - The camera viewing the vertex.
-    /// @param[in]  lights - The lights potentially shining on the vertex.
-    /// @return The computed light color.
-    Color SoftwareRasterizationAlgorithm::ComputeLighting(
-        const MATH::Vector3f& world_vertex,
-        const MATH::Vector3f& unit_vertex_normal,
-        const Material& material,
-        const Camera& camera,
-        const std::vector<Light>& lights)
-    {
-        Color light_total_color = Color::BLACK;
-        /// @todo   Figure this out...how to handle no lights?
-        if (lights.empty())
-        {
-            light_total_color = Color(1.0f, 1.0f, 1.0f, 1.0f);
-        }
-        for (const Light& light : lights)
-        {
-            // COMPUTE SHADING BASED ON TYPE OF LIGHT.
-            if (LightType::AMBIENT == light.Type)
-            {
-                if (ShadingType::MATERIAL == material.Shading)
-                {
-                    light_total_color += Color::ComponentMultiplyRedGreenBlue(light.Color, material.AmbientColor);
-                }
-                else
-                {
-                    light_total_color += light.Color;
-                }
-            }
-            else
-            {
-                // GET THE DIRECTION OF THE LIGHT.
-                MATH::Vector3f current_world_vertex = MATH::Vector3f(world_vertex.X, world_vertex.Y, world_vertex.Z);
-                MATH::Vector3f direction_from_vertex_to_light;
-                if (LightType::DIRECTIONAL == light.Type)
-                {
-                    // The computations are based on the opposite direction.
-                    direction_from_vertex_to_light = MATH::Vector3f::Scale(-1.0f, light.DirectionalLightDirection);
-                }
-                else if (LightType::POINT == light.Type)
-                {
-                    direction_from_vertex_to_light = light.PointLightWorldPosition - current_world_vertex;
-                }
-
-                // ADD DIFFUSE COLOR FROM THE CURRENT LIGHT.
-                // This is based on the Lambertian shading model.
-                // An object is maximally illuminated when facing toward the light.
-                // An object tangent to the light direction or facing away receives no illumination.
-                // In-between, the amount of illumination is proportional to the cosine of the angle between
-                // the light and surface normal (where the cosine can be computed via the dot product).
-                MATH::Vector3f unit_direction_from_point_to_light = MATH::Vector3f::Normalize(direction_from_vertex_to_light);
-                constexpr float NO_ILLUMINATION = 0.0f;
-                float illumination_proportion = MATH::Vector3f::DotProduct(unit_vertex_normal, unit_direction_from_point_to_light);
-                illumination_proportion = std::max(NO_ILLUMINATION, illumination_proportion);
-                Color current_light_color = Color::ScaleRedGreenBlue(illumination_proportion, light.Color);
-                if (ShadingType::MATERIAL == material.Shading)
-                {
-                    light_total_color += Color::ComponentMultiplyRedGreenBlue(current_light_color, material.DiffuseColor);
-                }
-                else
-                {
-                    light_total_color += current_light_color;
-                }
-
-                // ADD SPECULAR COLOR FROM THE CURRENT LIGHT.
-                /// @todo   Is this how we want to handle specularity?
-                if (material.SpecularPower > 1.0f)
-                {
-                    MATH::Vector3f reflected_light_along_surface_normal = MATH::Vector3f::Scale(2.0f * illumination_proportion, unit_vertex_normal);
-                    MATH::Vector3f reflected_light_direction = reflected_light_along_surface_normal - unit_direction_from_point_to_light;
-                    MATH::Vector3f unit_reflected_light_direction = MATH::Vector3f::Normalize(reflected_light_direction);
-
-                    MATH::Vector3f ray_from_vertex_to_camera = camera.WorldPosition - current_world_vertex;
-                    MATH::Vector3f normalized_ray_from_vertex_to_camera = MATH::Vector3f::Normalize(ray_from_vertex_to_camera);
-                    float specular_proportion = MATH::Vector3f::DotProduct(normalized_ray_from_vertex_to_camera, unit_reflected_light_direction);
-                    specular_proportion = std::max(NO_ILLUMINATION, specular_proportion);
-                    specular_proportion = std::pow(specular_proportion, material.SpecularPower);
-
-                    Color current_light_specular_color = Color::ScaleRedGreenBlue(specular_proportion, light.Color);
-
-                    if (ShadingType::MATERIAL == material.Shading)
-                    {
-                        light_total_color += Color::ComponentMultiplyRedGreenBlue(current_light_specular_color, material.SpecularColor);
-                    }
-                    else
-                    {
-                        light_total_color += current_light_specular_color;
-                    }
-                }
-            }
-        }
-
-        // RETURN THE COMPUTED LIGHTING COLOR.
-        return light_total_color;
-    }
-
     /// Renders a single triangle to the render target.
     /// @param[in]  triangle - The triangle to render.
     /// @param[in,out]  render_target - The target to render to.
@@ -347,40 +167,6 @@ namespace GRAPHICS
         switch (triangle.Material->Shading)
         {
             case ShadingType::WIREFRAME:
-            {
-                // GET THE COLOR.
-                /// @todo   Assuming all vertices have the same color here.
-                Color wireframe_color = triangle.VertexColors[0];
-
-                // DRAW THE FIRST EDGE.
-                DrawLine(
-                    first_vertex.X,
-                    first_vertex.Y,
-                    second_vertex.X,
-                    second_vertex.Y,
-                    wireframe_color,
-                    render_target);
-
-                // DRAW THE SECOND EDGE.
-                DrawLine(
-                    second_vertex.X,
-                    second_vertex.Y,
-                    third_vertex.X,
-                    third_vertex.Y,
-                    wireframe_color,
-                    render_target);
-
-                // DRAW THE THIRD EDGE.
-                DrawLine(
-                    third_vertex.X,
-                    third_vertex.Y,
-                    first_vertex.X,
-                    first_vertex.Y,
-                    wireframe_color,
-                    render_target);
-                break;
-            }
-            case ShadingType::WIREFRAME_VERTEX_COLOR_INTERPOLATION:
             {
                 // GET THE VERTEX COLORS.
                 Color vertex_0_wireframe_color = triangle.VertexColors[0];
