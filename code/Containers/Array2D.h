@@ -38,6 +38,7 @@ namespace CONTAINERS
         unsigned int GetWidth() const;
         unsigned int GetHeight() const;
         void Resize(const unsigned int width, const unsigned int height);
+        void Fill(const T& value);
 
         // BOUNDS CHECKING.
         bool IndicesInRange(const unsigned int x, const unsigned int y) const;
@@ -157,6 +158,14 @@ namespace CONTAINERS
         // Move assignment is used because some types stored in an array
         // (like unique_ptr) may be move assignable but not copy assignable.
         (*this) = std::move(resized_array);
+    }
+
+    /// Fills the array with the specified value.
+    /// @param[in]  value - The value to fill the array with.
+    template <typename T>
+    void Array2D<T>::Fill(const T& value)
+    {
+        Data.assign(Data.size(), value);
     }
 
     /// Determines if the provided indices are in range of this array's bounds.

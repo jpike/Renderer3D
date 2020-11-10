@@ -10,6 +10,7 @@
 #include <Windows.h>
 #include "Graphics/Camera.h"
 #include "Graphics/Cube.h"
+#include "Graphics/DepthBuffer.h"
 #include "Graphics/FrameTimer.h"
 #include "Graphics/Gui/Font.h"
 #include "Graphics/Gui/Text.h"
@@ -27,6 +28,8 @@
 static std::unique_ptr<WINDOWING::Win32Window> g_window = nullptr;
 
 static GRAPHICS::Camera g_camera;
+
+static bool g_depth_buffer_enabled = false;
 
 static std::size_t g_scene_index = 0;
 static std::string g_scene_title;
@@ -481,6 +484,11 @@ LRESULT CALLBACK MainWindowCallback(
                     g_backface_culling = !g_backface_culling;
                     break;
                 };
+                case INPUT_CONTROL::Key::W: // Not sure what other key to use for this.
+                {
+                    g_depth_buffer_enabled = !g_depth_buffer_enabled;
+                    break;
+                }
                 case INPUT_CONTROL::Key::S:
                 {
                     constexpr std::size_t MAX_SCENE_COUNT = 5;
@@ -601,6 +609,9 @@ int CALLBACK WinMain(
     GRAPHICS::Bitmap perspective_projected_drawing(SCREEN_WIDTH_IN_PIXELS / 2, 400, GRAPHICS::ColorFormat::ARGB);
     GRAPHICS::Bitmap orthographic_projected_drawing(SCREEN_WIDTH_IN_PIXELS / 2, 400, GRAPHICS::ColorFormat::ARGB);
     GRAPHICS::Bitmap debug_text_drawing(SCREEN_WIDTH_IN_PIXELS, 200, GRAPHICS::ColorFormat::ARGB);
+
+    GRAPHICS::DepthBuffer perspective_depth_buffer(perspective_projected_drawing.GetWidthInPixels(), perspective_projected_drawing.GetHeightInPixels());
+    GRAPHICS::DepthBuffer orthographic_depth_buffer(orthographic_projected_drawing.GetWidthInPixels(), orthographic_projected_drawing.GetWidthInPixels());
 
     g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
     g_camera.NearClipPlaneViewDistance = 1.0f;
@@ -782,10 +793,24 @@ int CALLBACK WinMain(
         // RENDER THE 3D SCENE.
         g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
         g_scene.BackgroundColor = GRAPHICS::Color(0.1f, 0.1f, 0.1f, 1.0f);
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, perspective_projected_drawing);
+        if (g_depth_buffer_enabled)
+        {
+            GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, perspective_projected_drawing, &perspective_depth_buffer);
+        }
+        else
+        {
+            GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, perspective_projected_drawing, nullptr);
+        }
         g_camera.Projection = GRAPHICS::ProjectionType::ORTHOGRAPHIC;
         g_scene.BackgroundColor = GRAPHICS::Color(0.2f, 0.2f, 0.2f, 1.0f);
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, orthographic_projected_drawing);
+        if (g_depth_buffer_enabled)
+        {
+            GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, orthographic_projected_drawing, &orthographic_depth_buffer);
+        }
+        else
+        {
+            GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, orthographic_projected_drawing, nullptr);
+        }
 
         // RENDER DEBUG TEXT.
         debug_text_drawing.FillPixels(GRAPHICS::Color::BLACK);
@@ -805,7 +830,7 @@ int CALLBACK WinMain(
         debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
         GRAPHICS::GUI::Text backface_culling_text =
         {
-            .String = "Backface Culling: " + std::to_string(g_backface_culling),
+            .String = "Backface Culling: " + std::to_string(g_backface_culling) + " Depth Buffer: " + std::to_string(g_depth_buffer_enabled),
             .Font = font.get(),
             .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
         };

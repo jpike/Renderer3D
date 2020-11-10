@@ -5,6 +5,7 @@
 #include "Graphics/Camera.cpp"
 #include "Graphics/Color.cpp"
 #include "Graphics/Cube.cpp"
+#include "Graphics/DepthBuffer.cpp"
 #include "Graphics/FrameTimer.cpp"
 #include "Graphics/Gui/Font.cpp"
 #include "Graphics/Gui/Glyph.cpp"

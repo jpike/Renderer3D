@@ -53,15 +53,25 @@ namespace GRAPHICS
     /// @param[in]  camera - The camera to use to view the scene.
     /// @param[in]  cull_backfaces - True if backfaces should be culled; false otherwise.
     /// @param[in,out]  output_bitmap - The bitmap to render to.
-    void SoftwareRasterizationAlgorithm::Render(const Scene& scene, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap)
+    /// @param[in,out]  depth_buffer - The depth buffer to use for any depth buffering.
+    void SoftwareRasterizationAlgorithm::Render(
+        const Scene& scene, 
+        const Camera& camera, 
+        const bool cull_backfaces, 
+        Bitmap& output_bitmap,
+        DepthBuffer* depth_buffer)
     {
         // CLEAR THE BACKGROUND.
         output_bitmap.FillPixels(scene.BackgroundColor);
+        if (depth_buffer)
+        {
+            depth_buffer->ClearToDepth(DepthBuffer::MAX_DEPTH);
+        }
 
         // RENDER EACH OBJECT IN THE SCENE.
         for (const auto& object_3D : scene.Objects)
         {
-            Render(object_3D, scene.PointLights, camera, cull_backfaces, output_bitmap);
+            Render(object_3D, scene.PointLights, camera, cull_backfaces, output_bitmap, depth_buffer);
         }
     }
 
@@ -70,7 +80,14 @@ namespace GRAPHICS
     /// @param[in]  lights - Any lights that should illuminate the object.
     /// @param[in]  camera - The camera to use to view the object.
     /// @param[in,out]  output_bitmap - The bitmap to render to.
-    void SoftwareRasterizationAlgorithm::Render(const Object3D& object_3D, const std::optional<std::vector<Light>>& lights, const Camera& camera, const bool cull_backfaces, Bitmap& output_bitmap)
+    /// @param[in,out]  depth_buffer - The depth buffer to use for any depth buffering.
+    void SoftwareRasterizationAlgorithm::Render(
+        const Object3D& object_3D, 
+        const std::optional<std::vector<Light>>& lights, 
+        const Camera& camera, 
+        const bool cull_backfaces, 
+        Bitmap& output_bitmap,
+        DepthBuffer* depth_buffer)
     {
         // GET RE-USED TRANSFORMATIONS.
         // This is done before the loop to avoid performance hits for repeatedly calculating these matrices.
@@ -124,7 +141,7 @@ namespace GRAPHICS
             }
 
             // RENDER THE FINAL SCREEN SPACE TRIANGLE.
-            Render(*screen_space_triangle, output_bitmap);
+            Render(*screen_space_triangle, output_bitmap, depth_buffer);
         }
     }
 
@@ -155,7 +172,11 @@ namespace GRAPHICS
     /// Renders a single triangle to the render target.
     /// @param[in]  triangle - The triangle to render.
     /// @param[in,out]  render_target - The target to render to.
-    void SoftwareRasterizationAlgorithm::Render(const ScreenSpaceTriangle& triangle, Bitmap& render_target)
+    /// @param[in,out]  depth_buffer - The depth buffer to use for any depth buffering.
+    void SoftwareRasterizationAlgorithm::Render(
+        const ScreenSpaceTriangle& triangle, 
+        Bitmap& render_target,
+        DepthBuffer* depth_buffer)
     {
         // GET THE VERTICES.
         // They're needed for all kinds of shading.
@@ -175,33 +196,30 @@ namespace GRAPHICS
 
                 // DRAW THE FIRST EDGE.
                 DrawLineWithInterpolatedColor(
-                    first_vertex.X,
-                    first_vertex.Y,
-                    second_vertex.X,
-                    second_vertex.Y,
+                    first_vertex,
+                    second_vertex,
                     vertex_0_wireframe_color,
                     vertex_1_wireframe_color,
-                    render_target);
+                    render_target,
+                    depth_buffer);
 
                 // DRAW THE SECOND EDGE.
                 DrawLineWithInterpolatedColor(
-                    second_vertex.X,
-                    second_vertex.Y,
-                    third_vertex.X,
-                    third_vertex.Y,
+                    second_vertex,
+                    third_vertex,
                     vertex_1_wireframe_color,
                     vertex_2_wireframe_color,
-                    render_target);
+                    render_target,
+                    depth_buffer);
 
                 // DRAW THE THIRD EDGE.
                 DrawLineWithInterpolatedColor(
-                    third_vertex.X,
-                    third_vertex.Y,
-                    first_vertex.X,
-                    first_vertex.Y,
+                    third_vertex,
+                    first_vertex,
                     vertex_2_wireframe_color,
                     vertex_0_wireframe_color,
-                    render_target);
+                    render_target,
+                    depth_buffer);
                 break;
             }
             case ShadingType::FLAT:
@@ -286,6 +304,26 @@ namespace GRAPHICS
                             pixel_between_right_edge_and_left_vertex);
                         if (pixel_in_triangle)
                         {
+                            float interpolated_z = (
+                                (scaled_signed_distance_of_current_pixel_relative_to_right_edge * third_vertex.Z) +
+                                (scaled_signed_distance_of_current_pixel_relative_to_left_edge * second_vertex.Z) +
+                                (scaled_signed_distance_of_current_pixel_relative_to_bottom_edge * first_vertex.Z));
+
+                            // Apply depth buffering filtering if applicable.
+                            unsigned int current_pixel_x = static_cast<unsigned int>(std::round(x));
+                            unsigned int current_pixel_y = static_cast<unsigned int>(std::round(y));
+                            if (depth_buffer)
+                            {
+                                float current_pixel_depth = depth_buffer->GetDepth(current_pixel_x, current_pixel_y);
+                                bool current_pixel_in_front_of_old_pixels = (interpolated_z <= current_pixel_depth);
+                                if (!current_pixel_in_front_of_old_pixels)
+                                {
+                                    // Continue to the next iteration of the loop in
+                                    // case there is another pixel to draw.
+                                    continue;
+                                }
+                            }
+
                             // GET THE COLOR.
                             /// @todo   Assuming all vertices have the same color here.
                             Color face_color = triangle.VertexColors[0];
@@ -294,9 +332,13 @@ namespace GRAPHICS
                             // The coordinates need to be rounded to integer in order
                             // to plot a pixel on a fixed grid.
                             render_target.WritePixel(
-                                static_cast<unsigned int>(std::round(x)),
-                                static_cast<unsigned int>(std::round(y)),
+                                current_pixel_x,
+                                current_pixel_y,
                                 face_color);
+                            if (depth_buffer)
+                            {
+                                depth_buffer->WriteDepth(current_pixel_x, current_pixel_y, interpolated_z);
+                            }
                         }
                     }
                 }
@@ -369,6 +411,7 @@ namespace GRAPHICS
                             scaled_signed_distance_of_current_pixel_relative_to_bottom_edge);
 
                         // CHECK IF THE PIXEL IS WITHIN THE TRIANGLE.
+                        float interpolated_z = DepthBuffer::MAX_DEPTH;
                         // It's allowed to be on the borders too.
                         constexpr float MIN_SIGNED_DISTANCE_TO_BE_ON_EDGE = 0.0f;
                         constexpr float MAX_SIGNED_DISTANCE_TO_BE_ON_VERTEX = 1.0f;
@@ -406,6 +449,11 @@ namespace GRAPHICS
                                 (scaled_signed_distance_of_current_pixel_relative_to_left_edge * second_vertex_color.Blue) +
                                 (scaled_signed_distance_of_current_pixel_relative_to_bottom_edge * first_vertex_color.Blue));
                             interpolated_color.Clamp();
+
+                            interpolated_z = (
+                                (scaled_signed_distance_of_current_pixel_relative_to_right_edge * third_vertex.Z) +
+                                (scaled_signed_distance_of_current_pixel_relative_to_left_edge * second_vertex.Z) +
+                                (scaled_signed_distance_of_current_pixel_relative_to_bottom_edge * first_vertex.Z));
 
                             if (ShadingType::TEXTURED == triangle.Material->Shading)
                             {
@@ -454,12 +502,31 @@ namespace GRAPHICS
                                 interpolated_color.Clamp();
                             }
 
+                            // Apply depth buffering filtering if applicable.
+                            unsigned int current_pixel_x = static_cast<unsigned int>(std::round(x));
+                            unsigned int current_pixel_y = static_cast<unsigned int>(std::round(y));
+                            if (depth_buffer)
+                            {
+                                float current_pixel_depth = depth_buffer->GetDepth(current_pixel_x, current_pixel_y);
+                                bool current_pixel_in_front_of_old_pixels = (interpolated_z <= current_pixel_depth);
+                                if (!current_pixel_in_front_of_old_pixels)
+                                {
+                                    // Continue to the next iteration of the loop in
+                                    // case there is another pixel to draw.
+                                    continue;
+                                }
+                            }
+
                             // The coordinates need to be rounded to integer in order
                             // to plot a pixel on a fixed grid.
                             render_target.WritePixel(
-                                static_cast<unsigned int>(std::round(x)),
-                                static_cast<unsigned int>(std::round(y)),
+                                current_pixel_x,
+                                current_pixel_y,
                                 interpolated_color);
+                            if (depth_buffer)
+                            {
+                                depth_buffer->WriteDepth(current_pixel_x, current_pixel_y, interpolated_z);
+                            }
                         }
                     }
                 }
@@ -469,20 +536,26 @@ namespace GRAPHICS
     }
 
     /// Renders a line with the specified endpoints (in screen coordinates).
-    /// @param[in]  start_x - The starting x coordinate of the line.
-    /// @param[in]  start_y - The starting y coordinate of the line.
-    /// @param[in]  end_x - The ending x coordinate of the line.
-    /// @param[in]  end_y - The ending y coordinate of the line.
+    /// @param[in]  start_vertex - The starting coordinate of the line.
+    /// @param[in]  end_vertex - The ending coordinate of the line.
     /// @param[in]  color - The color of the line to draw.
     /// @param[in,out]  render_target - The target to render to.
+    /// @param[in,out]  depth_buffer - The depth buffer to use for any depth buffering.
     void SoftwareRasterizationAlgorithm::DrawLine(
-        const float start_x,
-        const float start_y,
-        const float end_x,
-        const float end_y,
+        const MATH::Vector3f& start_vertex,
+        const MATH::Vector3f& end_vertex,
         const Color& color,
-        Bitmap& render_target)
+        Bitmap& render_target,
+        DepthBuffer* depth_buffer)
     {
+        // EXTRACT COMPONENTS OF THE VERTEX.
+        float start_x = start_vertex.X;
+        float start_y = start_vertex.Y;
+        float start_z = start_vertex.Z;
+        float end_x = end_vertex.X;
+        float end_y = end_vertex.Y;
+        float end_z = end_vertex.Z;
+
         // CLAMP ENDPOINTS TO AVOID TRYING TO DRAW REALLY HUGE LINES OFF-SCREEN.
         constexpr float MIN_BITMAP_COORDINATE = 1.0f;
 
@@ -502,12 +575,16 @@ namespace GRAPHICS
         float x_increment = delta_x / length;
         float y_increment = delta_y / length;
 
+        float delta_z = end_z - start_z;
+        float z_increment = delta_z / length;
+
         // HAVE THE LINE START BEING DRAWN AT THE STARTING COORDINATES.
         float x = clamped_start_x;
         float y = clamped_start_y;
+        float z = start_z;
 
         // DRAW PIXELS FOR THE LINE.
-        for (float pixel_index = 0.0f; pixel_index <= length; ++pixel_index)
+        for (float pixel_index = 0.0f; pixel_index <= length; ++pixel_index, x += x_increment, y += y_increment, z += z_increment)
         {
             // PREVENT WRITING BEYOND THE BOUNDARIES OF THE RENDER TARGET.
             bool x_boundary_exceeded = (
@@ -521,42 +598,61 @@ namespace GRAPHICS
             {
                 // Continue to the next iteration of the loop in
                 // case there is another pixel to draw.
-                x += x_increment;
-                y += y_increment;
                 continue;
             }
 
+            // DETERMINE IF THE NEW Z IS IN FRONT.
+            unsigned int current_pixel_x = static_cast<unsigned int>(std::round(x));
+            unsigned int current_pixel_y = static_cast<unsigned int>(std::round(y));
+            if (depth_buffer)
+            {
+                float current_pixel_depth = depth_buffer->GetDepth(current_pixel_x, current_pixel_y);
+                bool current_pixel_in_front_of_old_pixels = (z <= current_pixel_depth);
+                if (!current_pixel_in_front_of_old_pixels)
+                {
+                    // Continue to the next iteration of the loop in
+                    // case there is another pixel to draw.
+                    continue;
+                }
+            }
+            
             // DRAW A PIXEL AT THE CURRENT POSITION.
             // The coordinates need to be rounded to integer in order
             // to plot a pixel on a fixed grid.
             render_target.WritePixel(
-                static_cast<unsigned int>(std::round(x)),
-                static_cast<unsigned int>(std::round(y)),
+                current_pixel_x,
+                current_pixel_y,
                 color);
-
-            // MOVE ALONG THE LINE FOR THE NEXT PIXEL.
-            x += x_increment;
-            y += y_increment;
+            if (depth_buffer)
+            {
+                depth_buffer->WriteDepth(current_pixel_x, current_pixel_y, z);
+            }
         }
     }
 
     /// Renders a line with the specified endpoints (in screen coordinates) and interpolated color.
-    /// @param[in]  start_x - The starting x coordinate of the line.
-    /// @param[in]  start_y - The starting y coordinate of the line.
-    /// @param[in]  end_x - The ending x coordinate of the line.
-    /// @param[in]  end_y - The ending y coordinate of the line.
+    /// @param[in]  start_vertex - The starting coordinate of the line.
+    /// @param[in]  end_vertex - The ending coordinate of the line.
     /// @param[in]  start_color - The color of the line at the starting coordinate.
     /// @param[in]  end_color - The color of the line at the ending coordinate.
     /// @param[in,out]  render_target - The target to render to.
+    /// @param[in,out]  depth_buffer - The depth buffer to use for any depth buffering.
     void SoftwareRasterizationAlgorithm::DrawLineWithInterpolatedColor(
-        const float start_x,
-        const float start_y,
-        const float end_x,
-        const float end_y,
+        const MATH::Vector3f& start_vertex,
+        const MATH::Vector3f& end_vertex,
         const Color& start_color,
         const Color& end_color,
-        Bitmap& render_target)
+        Bitmap& render_target,
+        DepthBuffer* depth_buffer)
     {
+        // EXTRACT COMPONENTS OF THE VERTEX.
+        float start_x = start_vertex.X;
+        float start_y = start_vertex.Y;
+        float start_z = start_vertex.Z;
+        float end_x = end_vertex.X;
+        float end_y = end_vertex.Y;
+        float end_z = end_vertex.Z;
+
         // CLAMP ENDPOINTS TO AVOID TRYING TO DRAW REALLY HUGE LINES OFF-SCREEN.
         constexpr float MIN_BITMAP_COORDINATE = 1.0f;
 
@@ -581,12 +677,16 @@ namespace GRAPHICS
         float x_increment = delta_x / length;
         float y_increment = delta_y / length;
 
+        float delta_z = end_z - start_z;
+        float z_increment = delta_z / length;
+
         // HAVE THE LINE START BEING DRAWN AT THE STARTING COORDINATES.
         float x = clamped_start_x;
         float y = clamped_start_y;
+        float z = start_z;
 
         // DRAW PIXELS FOR THE LINE.
-        for (float pixel_index = 0.0f; pixel_index <= length; ++pixel_index)
+        for (float pixel_index = 0.0f; pixel_index <= length; ++pixel_index, x += x_increment, y += y_increment, z += z_increment)
         {
             // PREVENT WRITING BEYOND THE BOUNDARIES OF THE RENDER TARGET.
             bool x_boundary_exceeded = (
@@ -600,9 +700,22 @@ namespace GRAPHICS
             {
                 // Continue to the next iteration of the loop in
                 // case there is another pixel to draw.
-                x += x_increment;
-                y += y_increment;
                 continue;
+            }
+
+            // DETERMINE IF THE NEW Z IS IN FRONT.
+            unsigned int current_pixel_x = static_cast<unsigned int>(std::round(x));
+            unsigned int current_pixel_y = static_cast<unsigned int>(std::round(y));
+            if (depth_buffer)
+            {
+                float current_pixel_depth = depth_buffer->GetDepth(current_pixel_x, current_pixel_y);
+                bool current_pixel_in_front_of_old_pixels = (z <= current_pixel_depth);
+                if (!current_pixel_in_front_of_old_pixels)
+                {
+                    // Continue to the next iteration of the loop in
+                    // case there is another pixel to draw.
+                    continue;
+                }
             }
 
             // CALCULATE THE COLOR AT THE CURRENT POINT.
@@ -615,13 +728,13 @@ namespace GRAPHICS
             // The coordinates need to be rounded to integer in order
             // to plot a pixel on a fixed grid.
             render_target.WritePixel(
-                static_cast<unsigned int>(std::round(x)),
-                static_cast<unsigned int>(std::round(y)),
+                current_pixel_x,
+                current_pixel_y,
                 interpolated_color);
-
-            // MOVE ALONG THE LINE FOR THE NEXT PIXEL.
-            x += x_increment;
-            y += y_increment;
+            if (depth_buffer)
+            {
+                depth_buffer->WriteDepth(current_pixel_x, current_pixel_y, z);
+            }
         }
     }
 }
