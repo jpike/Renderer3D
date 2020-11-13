@@ -1,5 +1,5 @@
 {
-  "version": "0.2.1",
+    "version": "0.2.1",
     "tasks": 
     [
         {
@@ -33,6 +33,14 @@
             "type": "launch",
             "contextType": "build",
             "command": "build_demo_software.bat"
-        }
+        },
+        {
+            "taskName": "task-build-demo-opengl",
+            "taskLabel": "task-build-demo-opengl",
+            "appliesTo": "build_demo_opengl.bat",
+            "type": "launch",
+            "contextType": "build",
+            "command": "build_demo_opengl.bat"
+        },
     ]
 }

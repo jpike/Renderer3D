@@ -16,8 +16,10 @@
 #include "Graphics/Gui/Text.h"
 #include "Graphics/Modeling/WavefrontObjectModel.h"
 #include "Graphics/Object3D.h"
+#include "Graphics/OpenGL/GraphicsDevice.h"
+#include "Graphics/OpenGL/OpenGL.h"
+#include "Graphics/OpenGL/OpenGLRenderer.h"
 #include "Graphics/Scene.h"
-#include "Graphics/SoftwareRasterizationAlgorithm.h"
 #include "Graphics/Triangle.h"
 #include "InputControl/Key.h"
 #include "Windowing/Win32Window.h"
@@ -584,7 +586,7 @@ int CALLBACK WinMain(
     window_class.lpszClassName = "WindowClass";
 
     // CREATE THE WINDOW.
-    constexpr unsigned int SCREEN_WIDTH_IN_PIXELS = 800;
+    constexpr unsigned int SCREEN_WIDTH_IN_PIXELS = 600;
     constexpr unsigned int SCREEN_HEIGHT_IN_PIXELS = 600;
     g_window = WINDOWING::Win32Window::Create(
         window_class,
@@ -598,24 +600,44 @@ int CALLBACK WinMain(
         return EXIT_FAILURE;
     }
 
-    // LOAD THE DEFAULT FONT.
-    std::shared_ptr<GRAPHICS::GUI::Font> font = GRAPHICS::GUI::Font::LoadSystemDefaultFixedFont();
-    if (!font)
+    // CREATE THE RENDERER.
+    GRAPHICS::OPEN_GL::OpenGLRenderer open_gl_renderer;
+
+    // GET THE DEVICE CONTEXT OF THE WINDOW.
+    HDC device_context = GetDC(g_window->WindowHandle);
+    bool device_context_retrieved = (NULL != device_context);
+    if (!device_context_retrieved)
     {
-        OutputDebugString("Failed to load default font.");
+        OutputDebugString("Failed to get window device context.");
         return EXIT_FAILURE;
     }
 
-    GRAPHICS::Bitmap perspective_projected_drawing(SCREEN_WIDTH_IN_PIXELS / 2, 400, GRAPHICS::ColorFormat::ARGB);
-    GRAPHICS::Bitmap orthographic_projected_drawing(SCREEN_WIDTH_IN_PIXELS / 2, 400, GRAPHICS::ColorFormat::ARGB);
-    GRAPHICS::Bitmap debug_text_drawing(SCREEN_WIDTH_IN_PIXELS, 200, GRAPHICS::ColorFormat::ARGB);
+    // INITIALIZE OPEN GL.
+    bool open_gl_initialized = GRAPHICS::OPEN_GL::Initialize(device_context);
+    if (!open_gl_initialized)
+    {
+        OutputDebugString("Failed to initialize OpenGL.");
+        return EXIT_FAILURE;
+    }
 
-    GRAPHICS::DepthBuffer perspective_depth_buffer(perspective_projected_drawing.GetWidthInPixels(), perspective_projected_drawing.GetHeightInPixels());
-    GRAPHICS::DepthBuffer orthographic_depth_buffer(orthographic_projected_drawing.GetWidthInPixels(), orthographic_projected_drawing.GetWidthInPixels());
+    // CREATE THE GRAPHICS DEVICE.
+    auto open_gl_graphics_device = GRAPHICS::OPEN_GL::GraphicsDevice::Create(device_context);
+    bool graphics_device_created = (nullptr != open_gl_graphics_device);
+    if (!graphics_device_created)
+    {
+        OutputDebugString("Failed to create the graphics device.");
+        return EXIT_FAILURE;
+    }
 
+    /// @todo   Where to put these?
+    /// @todo   Centralize screen dimensions!
+    glViewport(0, 0, SCREEN_WIDTH_IN_PIXELS, SCREEN_HEIGHT_IN_PIXELS);
+
+    // CREATE THE CAMERA.
     g_camera = GRAPHICS::Camera::LookAtFrom(MATH::Vector3f(0.0f, 0.0f, 0.0f), MATH::Vector3f(0.0f, 0.0f, 2.0f));
+    g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
     g_camera.NearClipPlaneViewDistance = 1.0f;
-    g_camera.FarClipPlaneViewDistance = 1000.0f;
+    g_camera.FarClipPlaneViewDistance = 500.0f;
 
     // LOAD A TEXTURE FOR TESTING.
     std::shared_ptr<GRAPHICS::Bitmap> texture = GRAPHICS::Bitmap::Load("../assets/test_texture1.bmp");
@@ -693,7 +715,7 @@ int CALLBACK WinMain(
         {
             /// @todo   Make this get values directly from the "material".
             .Shading = GRAPHICS::ShadingType::MATERIAL,
-            .VertexColors = 
+            .VertexColors =
             {
                 GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
                 GRAPHICS::Color(0.5f, 0.5f, 0.5f, 1.0f),
@@ -793,144 +815,22 @@ int CALLBACK WinMain(
         // RENDER THE 3D SCENE.
         g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
         g_scene.BackgroundColor = GRAPHICS::Color(0.1f, 0.1f, 0.1f, 1.0f);
-        if (g_depth_buffer_enabled)
-        {
-            GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, perspective_projected_drawing, &perspective_depth_buffer);
-        }
-        else
-        {
-            GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, perspective_projected_drawing, nullptr);
-        }
-        g_camera.Projection = GRAPHICS::ProjectionType::ORTHOGRAPHIC;
-        g_scene.BackgroundColor = GRAPHICS::Color(0.2f, 0.2f, 0.2f, 1.0f);
-        if (g_depth_buffer_enabled)
-        {
-            GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, orthographic_projected_drawing, &orthographic_depth_buffer);
-        }
-        else
-        {
-            GRAPHICS::SoftwareRasterizationAlgorithm::Render(g_scene, g_camera, g_backface_culling, orthographic_projected_drawing, nullptr);
-        }
-
-        // RENDER DEBUG TEXT.
-        debug_text_drawing.FillPixels(GRAPHICS::Color::BLACK);
-
+        
         // DISPLAY STATISICS ABOUT FRAME TIMING.
         frame_timer.EndTimingFrame();
-        float debug_text_top_y_position = 0.0f;
-
-        GRAPHICS::GUI::Text control_help_text =
-        {
-            .String = "CamP=Arrow,D|Clip=N,F|FOV=V|B=Backface|XYZ=Rotate|S=Scene|M=Mat|L=Light",
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(control_help_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text backface_culling_text =
-        {
-            .String = "Backface Culling: " + std::to_string(g_backface_culling) + " Depth Buffer: " + std::to_string(g_depth_buffer_enabled),
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(backface_culling_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text scene_text =
-        {
-            .String = "Scene: " + g_scene_title + " (" + std::to_string(g_scene_index) + ")",
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(scene_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text material_text =
-        {
-            .String = "Material: " + std::to_string(g_current_material_index) + " " + g_material_names[g_current_material_index],
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(material_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text lighting_text =
-        {
-            .String = "Lighting: " + std::to_string(g_current_light_index) + " " + g_light_configuration_names[g_current_light_index],
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(lighting_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text frame_timing_text =
-        {
-            .String = frame_timer.GetFrameTimingText(),
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(frame_timing_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text camera_position_text =
-        {
-            .String = "Camera World Position = " + g_camera.WorldPosition.ToString(),
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(camera_position_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text camera_right_text =
-        {
-            .String = "Camera Right = " + g_camera.CoordinateFrame.Right.ToString(),
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(camera_right_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text camera_up_text =
-        {
-            .String = "Camera Up = " + g_camera.CoordinateFrame.Up.ToString(),
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(camera_up_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text camera_forward_text =
-        {
-            // Note that this is actually "backwards" from the view direction.
-            .String = "Camera Forward = " + g_camera.CoordinateFrame.Forward.ToString(),
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(camera_forward_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text camera_clip_planes_text =
-        {
-            .String = "Camera Near/Far Clip Distances = " + std::to_string(g_camera.NearClipPlaneViewDistance) + ", " + std::to_string(g_camera.FarClipPlaneViewDistance),
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(camera_clip_planes_text, debug_text_drawing);
-
-        debug_text_top_y_position += GRAPHICS::GUI::Font::GLYPH_DIMENSION_IN_PIXELS;
-        GRAPHICS::GUI::Text camera_fov_text =
-        {
-            .String = "Camera FOV = " + std::to_string(g_camera.FieldOfView.Value),
-            .Font = font.get(),
-            .LeftTopPosition = MATH::Vector2f(0.0f, debug_text_top_y_position)
-        };
-        GRAPHICS::SoftwareRasterizationAlgorithm::Render(camera_fov_text, debug_text_drawing);
 
         // DISPLAY THE RENDERED IMAGE IN THE WINDOW.
-        g_window->DisplayAt(perspective_projected_drawing, 0, 0);
-        g_window->DisplayAt(orthographic_projected_drawing, perspective_projected_drawing.GetWidthInPixels(), 0);
-        g_window->DisplayAt(debug_text_drawing, 0, orthographic_projected_drawing.GetHeightInPixels());
+        open_gl_renderer.Render(g_scene, g_camera);
+
+        glFlush();
+
+        GLenum error = glGetError();
+        if (error != GL_NO_ERROR)
+        {
+            error = error;
+        }
+
+        SwapBuffers(open_gl_graphics_device->DeviceContext);
 
 #define FRAME_RATE_CAP 0
 #if FRAME_RATE_CAP
