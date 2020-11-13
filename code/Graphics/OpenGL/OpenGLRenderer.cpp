@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <gl/GL.h>
 #include <gl/GLU.h>
+#include <GL/gl3w.h>
 #include "Graphics/OpenGL/OpenGLRenderer.h"
 
 namespace GRAPHICS::OPEN_GL
@@ -8,12 +9,21 @@ namespace GRAPHICS::OPEN_GL
     /// Renders an entire 3D scene.
     /// @param[in]  scene - The scene to render.
     /// @param[in]  camera - The camera to use to view the scene.
-    void OpenGLRenderer::Render(const Scene& scene, const Camera& camera) const
+    void OpenGLRenderer::Render(const Scene& scene, const Camera& camera, int primitive_type, unsigned int first_primitive_offset, unsigned int primitive_count) const
     {
-        glEnable(GL_DEPTH_TEST);
+        /// @todo
+        camera;
+
+        //glEnable(GL_DEPTH_TEST);
 
         ClearScreen(scene.BackgroundColor);
 
+        for (const auto& object_3D : scene.Objects)
+        {            
+            Render(object_3D, primitive_type, first_primitive_offset, primitive_count);
+        }
+
+#if OLD_OPEN_GL
         // SET LIGHTING IF APPROPRIATE.
         /// @todo   Better way to control lighting than presence/absence of light?
         bool lighting_enabled = bool(scene.PointLights);
@@ -124,20 +134,114 @@ namespace GRAPHICS::OPEN_GL
 
             glPopMatrix();
         }
+#endif
     }
 
     /// Clears the screen to the specified color.
     /// @param[in]  color - The color to clear to.
     void OpenGLRenderer::ClearScreen(const Color& color) const
     {
-        glClearColor(color.Red, color.Green, color.Blue, color.Alpha);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        //glClearColor(color.Red, color.Green, color.Blue, color.Alpha);
+        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        GLfloat background_color[] = { color.Red, color.Green, color.Blue, color.Alpha };
+        const GLint NO_SPECIFIC_DRAW_BUFFER = 0;
+        glClearBufferfv(GL_COLOR, NO_SPECIFIC_DRAW_BUFFER, background_color);
     }
 
     /// Renders the specified object.
     /// @param[in]  object_3D - The 3D object to render.
-    void OpenGLRenderer::Render(const Object3D& object_3D) const
+    void OpenGLRenderer::Render(const Object3D& object_3D, int primitive_type, unsigned int first_primitive_offset, unsigned int primitive_count) const
     {
+        /// @todo
+        primitive_type;
+        first_primitive_offset;
+        primitive_count;
+
+        /// @todo   Pass vertices for entire object at once!
+        /// @todo   Look at https://github.com/jpike/OpenGLEngine/ for possible better handling of some stuff?
+        for (const auto& triangle : object_3D.Triangles)
+        {
+            // USE THE TRIANGLE'S SHADER PROGRAM.
+            glUseProgram(object_3D.ShaderProgram->Id);
+
+            // ALLOCATE A VERTEX ARRAY/BUFFER.
+            const GLsizei ONE_VERTEX_ARRAY = 1;
+            GLuint vertex_array_id = 0;
+            glGenVertexArrays(ONE_VERTEX_ARRAY, &vertex_array_id);
+            glBindVertexArray(vertex_array_id);
+
+            const GLsizei ONE_VERTEX_BUFFER = 1;
+            GLuint vertex_buffer_id = 0;
+            glGenBuffers(ONE_VERTEX_BUFFER, &vertex_buffer_id);
+
+            // FILL THE BUFFER WITH THE VERTEX DATA.
+            constexpr std::size_t POSITION_COORDINATE_COUNT_PER_VERTEX = 4;
+            std::size_t VERTEX_POSITION_COORDINATE_TOTAL_COUNT = POSITION_COORDINATE_COUNT_PER_VERTEX * Triangle::VERTEX_COUNT;
+            constexpr std::size_t COLOR_COMPONENT_COUNT_PER_VERTEX = 4;
+            std::size_t VERTEX_COLOR_COMPONENT_TOTAL_COUNT = COLOR_COMPONENT_COUNT_PER_VERTEX * Triangle::VERTEX_COUNT;
+            std::size_t VERTEX_ATTRIBUTE_TOTAL_VALUE_COUNT = VERTEX_POSITION_COORDINATE_TOTAL_COUNT + VERTEX_COLOR_COMPONENT_TOTAL_COUNT;
+            
+            std::vector<float> vertex_attribute_values;
+            vertex_attribute_values.reserve(VERTEX_ATTRIBUTE_TOTAL_VALUE_COUNT);
+
+            for (std::size_t vertex_index = 0; vertex_index < Triangle::VERTEX_COUNT; ++vertex_index)
+            {
+                const MATH::Vector3f& vertex = triangle.Vertices[vertex_index];
+                vertex_attribute_values.emplace_back(vertex.X);
+                vertex_attribute_values.emplace_back(vertex.Y);
+                vertex_attribute_values.emplace_back(vertex.Z);
+                constexpr float HOMOGENEOUS_VERTEX_W = 1.0f;
+                vertex_attribute_values.emplace_back(HOMOGENEOUS_VERTEX_W);
+
+                const GRAPHICS::Color& vertex_color = triangle.Material->VertexColors[vertex_index];
+                vertex_attribute_values.emplace_back(vertex_color.Red);
+                vertex_attribute_values.emplace_back(vertex_color.Green);
+                vertex_attribute_values.emplace_back(vertex_color.Blue);
+                vertex_attribute_values.emplace_back(vertex_color.Alpha);
+            }
+
+            GLsizeiptr vertex_data_size_in_bytes = sizeof(float) * VERTEX_ATTRIBUTE_TOTAL_VALUE_COUNT;
+            glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_id);
+            glBufferData(GL_ARRAY_BUFFER, vertex_data_size_in_bytes, vertex_attribute_values.data(), GL_STATIC_DRAW);
+
+            // SPECIFY HOW VERTEX BUFFER DATA MAPS TO SHADER INPUTS.
+            constexpr GLboolean NO_NORMALIZATION = GL_FALSE;
+            constexpr GLsizei SINGLE_VERTEX_ATTRIBUTE_VALUE_COUNT = POSITION_COORDINATE_COUNT_PER_VERTEX + COLOR_COMPONENT_COUNT_PER_VERTEX;
+            constexpr GLsizei SINGLE_VERTEX_ENTIRE_DATA_SIZE_IN_BYTES = sizeof(float) * SINGLE_VERTEX_ATTRIBUTE_VALUE_COUNT;
+            constexpr uint64_t VERTEX_POSITION_STARTING_OFFSET_IN_BYTES = 0;
+            GLint local_vertex_position_variable_id = glGetAttribLocation(object_3D.ShaderProgram->Id, "local_vertex");
+            glVertexAttribPointer(
+                local_vertex_position_variable_id,
+                POSITION_COORDINATE_COUNT_PER_VERTEX,
+                GL_FLOAT,
+                NO_NORMALIZATION,
+                SINGLE_VERTEX_ENTIRE_DATA_SIZE_IN_BYTES,
+                (void*)VERTEX_POSITION_STARTING_OFFSET_IN_BYTES);
+            glEnableVertexAttribArray(local_vertex_position_variable_id);
+
+            const uint64_t VERTEX_COLOR_STARTING_OFFSET_IN_BYTES = sizeof(float) * POSITION_COORDINATE_COUNT_PER_VERTEX;
+            GLint vertex_color_variable_id = glGetAttribLocation(object_3D.ShaderProgram->Id, "input_vertex_color");
+            glVertexAttribPointer(
+                vertex_color_variable_id,
+                COLOR_COMPONENT_COUNT_PER_VERTEX,
+                GL_FLOAT,
+                NO_NORMALIZATION,
+                SINGLE_VERTEX_ENTIRE_DATA_SIZE_IN_BYTES,
+                (void*)VERTEX_COLOR_STARTING_OFFSET_IN_BYTES);
+            glEnableVertexAttribArray(vertex_color_variable_id);
+
+            // DRAW THE TRIANGLE.
+            const unsigned int FIRST_VERTEX = 0;
+            GLsizei vertex_count = static_cast<GLsizei>(Triangle::VERTEX_COUNT);
+            glDrawArrays(GL_TRIANGLES, FIRST_VERTEX, vertex_count);
+
+            /// @todo   Encapsulate this vertex array stuff with object?
+            glDeleteBuffers(ONE_VERTEX_BUFFER, &vertex_buffer_id);
+            glDeleteVertexArrays(ONE_VERTEX_ARRAY, &vertex_array_id);
+        }
+        
+#if OLD_OPEN_GL
         for (const auto& triangle : object_3D.Triangles)
         {
             // ALLOCATE A TEXTURE IF APPLICABLE.
@@ -295,5 +399,6 @@ namespace GRAPHICS::OPEN_GL
                 glDisable(GL_TEXTURE_2D);
             }
         }
+#endif
     }
 }

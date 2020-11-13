@@ -14,7 +14,10 @@ namespace OPEN_GL
         const HGLRC NO_CONTEXT_TO_SHARE_WITH = nullptr;
         const int context_attribute_list[] =
         {
+            WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
+            WGL_CONTEXT_MINOR_VERSION_ARB, 2,
             WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
+            WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
             ATTRIBUTE_LIST_TERMINATOR
         };
         HGLRC open_gl_render_context = wglCreateContextAttribsARB(device_context, NO_CONTEXT_TO_SHARE_WITH, context_attribute_list);

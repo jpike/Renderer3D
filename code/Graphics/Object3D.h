@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include "Graphics/OpenGL/ShaderProgram.h"
 #include "Graphics/Triangle.h"
 #include "Math/Angle.h"
 #include "Math/Matrix4x4.h"
@@ -24,5 +25,7 @@ namespace GRAPHICS
         MATH::Vector3< MATH::Angle<float>::Radians > RotationInRadians = MATH::Vector3< MATH::Angle<float>::Radians >();
         /// The scaling of the object.  Defaults to no scaling (using the size of the triangles exactly).
         MATH::Vector3f Scale = MATH::Vector3f(1.0f, 1.0f, 1.0f);
+        /// The shader program for the object, if one exists.
+        std::shared_ptr<OPEN_GL::ShaderProgram> ShaderProgram = nullptr;
     };
 }

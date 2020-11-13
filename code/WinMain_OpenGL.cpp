@@ -19,10 +19,73 @@
 #include "Graphics/OpenGL/GraphicsDevice.h"
 #include "Graphics/OpenGL/OpenGL.h"
 #include "Graphics/OpenGL/OpenGLRenderer.h"
+#include "Graphics/OpenGL/ShaderProgram.h"
 #include "Graphics/Scene.h"
 #include "Graphics/Triangle.h"
 #include "InputControl/Key.h"
 #include "Windowing/Win32Window.h"
+
+// OPEN GL SHADERS.
+static const char* SINGLE_POINT_VERTEX_SHADER = R"GLSL( 
+#version 420 core
+
+in vec4 local_vertex;
+in vec4 input_vertex_color;
+
+out VERTEX_SHADER_OUTPUT
+{
+    vec4 color;
+} vertex_shader_output;
+
+void main()
+{
+    gl_Position = local_vertex; //vec4(local_vertex.y, 0.5, 0.5, 1.0);
+    //gl_Position = vec4(
+        //float(gl_VertexID) / 2.0,
+        //float(gl_VertexID) / 5.0,
+        //0.5,
+        //1.0),
+
+    //vertex_shader_output.color = vec4(
+        //float(gl_VertexID) / 2.0,
+        //float(gl_VertexID) / 4.0,
+        //float(gl_VertexID) / 8.0,
+        //1.0);
+    vertex_shader_output.color = input_vertex_color;
+}
+)GLSL";
+
+#if 0
+const vec4 vertices[3] = vec4[3](
+        vec4( 0.5, -0.5, 0.5, 1.0),
+        vec4(-0.5, -0.5, 0.5, 1.0),
+        vec4( 0.5,  0.5, 0.5, 1.0));
+#endif
+
+static const char* SINGLE_COLOR_FRAGMENT_SHADER = R"GLSL(
+#version 420 core
+
+in VERTEX_SHADER_OUTPUT
+{
+    vec4 color;
+} fragment_shader_input;
+
+out vec4 fragment_color;
+
+void main()
+{
+    fragment_color = fragment_shader_input.color;
+}
+)GLSL";
+
+static unsigned int g_start_vertex_offset = 0;
+static unsigned int g_vertex_count = 3;
+
+static constexpr int MIN_RENDER_TYPE = GL_POINTS;
+static constexpr int MAX_RENDER_TYPE = GL_TRIANGLES;
+static int g_render_type = MIN_RENDER_TYPE;
+
+static std::shared_ptr<GRAPHICS::OPEN_GL::ShaderProgram> g_open_gl_shader = nullptr;
 
 // GLOBALS.
 // Global to provide access to them within the window procedure.
@@ -280,6 +343,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
                         MATH::Vector3f(1.0f, -1.0f, 0.0f)
                     })
             };
+            triangle_object.ShaderProgram = g_open_gl_shader;
             GRAPHICS::Scene scene;
             scene.Objects.push_back(triangle_object);
             return scene;
@@ -295,6 +359,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
             //constexpr float LARGER_TRIANGLE_SCALE = 50.0f;
             //larger_triangle.Scale = MATH::Vector3f(LARGER_TRIANGLE_SCALE, LARGER_TRIANGLE_SCALE, 1.0f);
             larger_triangle.WorldPosition = MATH::Vector3f(0.0f, 0.0f, 0.0f);
+            larger_triangle.ShaderProgram = g_open_gl_shader;
             GRAPHICS::Scene scene;
             scene.Objects.push_back(larger_triangle);
             return scene;
@@ -317,6 +382,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
                 float x_position = static_cast<float>(random_number_generator() % 16) - 8.0f;
                 float y_position = static_cast<float>(random_number_generator() % 16) - 8.0f;
                 current_object_3D.WorldPosition = MATH::Vector3f(x_position, y_position, -8.0f);
+                current_object_3D.ShaderProgram = g_open_gl_shader;
                 scene.Objects.push_back(current_object_3D);
             }
             return scene;
@@ -328,6 +394,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
             GRAPHICS::Object3D cube = GRAPHICS::Cube::Create(material);
             //cube.Scale = MATH::Vector3f(10.0f, 10.0f, 10.0f);
             cube.WorldPosition = MATH::Vector3f(0.0f, 0.0f, -2.0f);
+            cube.ShaderProgram = g_open_gl_shader;
 
             GRAPHICS::Scene scene;
             scene.Objects.push_back(cube);
@@ -349,6 +416,7 @@ GRAPHICS::Scene CreateScene(const std::size_t scene_index)
                 }
 #endif
                 cube_from_file->WorldPosition = MATH::Vector3f(0.0f, 0.0f, -2.0f);
+                cube_from_file->ShaderProgram = g_open_gl_shader;
                 scene.Objects.push_back(*cube_from_file);
             }
 
@@ -523,6 +591,63 @@ LRESULT CALLBACK MainWindowCallback(
                     g_scene.PointLights = g_light_configurations[g_current_light_index];
                     break;
                 };
+                case INPUT_CONTROL::Key::ONE:
+                {
+                    if (shift_down)
+                    {
+                        ++g_render_type;
+                    }
+                    else
+                    {
+                        --g_render_type;
+                    }
+
+                    if (g_render_type < MIN_RENDER_TYPE)
+                    {
+                        g_render_type = MAX_RENDER_TYPE;
+                    }
+                    else if (g_render_type > MAX_RENDER_TYPE)
+                    {
+                        g_render_type = MIN_RENDER_TYPE;
+                    }
+
+                    std::string render_type_string = "\nRender Type: " + std::to_string(g_render_type);
+                    OutputDebugString(render_type_string.c_str());
+
+                    break;
+                }
+                case INPUT_CONTROL::Key::TWO:
+                {
+                    if (shift_down)
+                    {
+                        ++g_start_vertex_offset;
+                    }
+                    else
+                    {
+                        --g_start_vertex_offset;
+                    }
+
+                    std::string start_vertex_offset_string = "\nStart Vertex Offset: " + std::to_string(g_start_vertex_offset);
+                    OutputDebugString(start_vertex_offset_string.c_str());
+
+                    break;
+                }
+                case INPUT_CONTROL::Key::THREE:
+                {
+                    if (shift_down)
+                    {
+                        ++g_vertex_count;
+                    }
+                    else
+                    {
+                        --g_vertex_count;
+                    }
+
+                    std::string vertex_count_string = "\nVertex Count: " + std::to_string(g_vertex_count);
+                    OutputDebugString(vertex_count_string.c_str());
+
+                    break;
+                }
                 default:
                     virtual_key_code;
                     break;
@@ -741,6 +866,11 @@ int CALLBACK WinMain(
         }),
     };
 
+    // INITIALIZE SHADERS.
+    g_open_gl_shader = GRAPHICS::OPEN_GL::ShaderProgram::Build(
+        SINGLE_POINT_VERTEX_SHADER,
+        SINGLE_COLOR_FRAGMENT_SHADER);
+
     g_scene_index = 0;
     g_current_material_index = 0;
     g_scene = CreateScene(g_scene_index);
@@ -820,13 +950,15 @@ int CALLBACK WinMain(
         frame_timer.EndTimingFrame();
 
         // DISPLAY THE RENDERED IMAGE IN THE WINDOW.
-        open_gl_renderer.Render(g_scene, g_camera);
+        open_gl_renderer.Render(g_scene, g_camera, g_render_type, g_start_vertex_offset, g_vertex_count);
 
         glFlush();
 
         GLenum error = glGetError();
         if (error != GL_NO_ERROR)
         {
+            std::string open_gl_error_message = "\nOpenGL error: " + std::to_string(error);
+            OutputDebugString(open_gl_error_message.c_str());
             error = error;
         }
 

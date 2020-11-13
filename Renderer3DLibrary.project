@@ -17,6 +17,7 @@
 #include "Graphics/OpenGL/GraphicsDevice.cpp"
 #include "Graphics/OpenGL/OpenGL.cpp"
 #include "Graphics/OpenGL/OpenGLRenderer.cpp"
+#include "Graphics/OpenGL/ShaderProgram.cpp"
 #include "Graphics/RayTracing/Ray.cpp"
 #include "Graphics/RayTracing/RayObjectIntersection.cpp"
 #include "Graphics/RayTracing/RayTracingAlgorithm.cpp"
