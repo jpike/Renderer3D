@@ -29,6 +29,10 @@
 static const char* SINGLE_POINT_VERTEX_SHADER = R"GLSL( 
 #version 420 core
 
+uniform mat4 world_transform;
+uniform mat4 view_transform;
+uniform mat4 projection_transform;
+
 in vec4 local_vertex;
 in vec4 input_vertex_color;
 
@@ -39,28 +43,11 @@ out VERTEX_SHADER_OUTPUT
 
 void main()
 {
-    gl_Position = local_vertex; //vec4(local_vertex.y, 0.5, 0.5, 1.0);
-    //gl_Position = vec4(
-        //float(gl_VertexID) / 2.0,
-        //float(gl_VertexID) / 5.0,
-        //0.5,
-        //1.0),
-
-    //vertex_shader_output.color = vec4(
-        //float(gl_VertexID) / 2.0,
-        //float(gl_VertexID) / 4.0,
-        //float(gl_VertexID) / 8.0,
-        //1.0);
+    //gl_Position =  projection_transform * view_transform * world_transform * local_vertex;
+    gl_Position = world_transform * local_vertex;
     vertex_shader_output.color = input_vertex_color;
 }
 )GLSL";
-
-#if 0
-const vec4 vertices[3] = vec4[3](
-        vec4( 0.5, -0.5, 0.5, 1.0),
-        vec4(-0.5, -0.5, 0.5, 1.0),
-        vec4( 0.5,  0.5, 0.5, 1.0));
-#endif
 
 static const char* SINGLE_COLOR_FRAGMENT_SHADER = R"GLSL(
 #version 420 core
@@ -591,6 +578,20 @@ LRESULT CALLBACK MainWindowCallback(
                     g_scene.PointLights = g_light_configurations[g_current_light_index];
                     break;
                 };
+                case INPUT_CONTROL::Key::P:
+                {
+                    // SWITCH PROJECTIONS.
+                    switch (g_camera.Projection)
+                    {
+                        case GRAPHICS::ProjectionType::ORTHOGRAPHIC:
+                            g_camera.Projection = GRAPHICS::ProjectionType::PERSPECTIVE;
+                            break;
+                        case GRAPHICS::ProjectionType::PERSPECTIVE:
+                            g_camera.Projection = GRAPHICS::ProjectionType::ORTHOGRAPHIC;
+                            break;
+                    }
+                    break;
+                }
                 case INPUT_CONTROL::Key::ONE:
                 {
                     if (shift_down)
@@ -950,7 +951,7 @@ int CALLBACK WinMain(
         frame_timer.EndTimingFrame();
 
         // DISPLAY THE RENDERED IMAGE IN THE WINDOW.
-        open_gl_renderer.Render(g_scene, g_camera, g_render_type, g_start_vertex_offset, g_vertex_count);
+        open_gl_renderer.Render(g_scene, g_camera);
 
         glFlush();
 

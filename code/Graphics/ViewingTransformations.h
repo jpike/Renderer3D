@@ -19,11 +19,11 @@ namespace GRAPHICS
     class ViewingTransformations
     {
     public:
+        explicit ViewingTransformations(const Camera& camera);
         explicit ViewingTransformations(const Camera& camera, const Bitmap& output_plane);
 
         std::optional<ScreenSpaceTriangle> Apply(const Triangle& world_triangle) const;
 
-    private:
         /// The transform to transform a vertex from world to camera view space.
         MATH::Matrix4x4f CameraViewTransform = {};
         /// The projection transform used by the camera.

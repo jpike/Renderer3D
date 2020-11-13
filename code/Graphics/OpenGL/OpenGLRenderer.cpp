@@ -9,18 +9,17 @@ namespace GRAPHICS::OPEN_GL
     /// Renders an entire 3D scene.
     /// @param[in]  scene - The scene to render.
     /// @param[in]  camera - The camera to use to view the scene.
-    void OpenGLRenderer::Render(const Scene& scene, const Camera& camera, int primitive_type, unsigned int first_primitive_offset, unsigned int primitive_count) const
+    void OpenGLRenderer::Render(const Scene& scene, const Camera& camera) const
     {
-        /// @todo
-        camera;
-
         //glEnable(GL_DEPTH_TEST);
+
+        ViewingTransformations viewing_transformations(camera);
 
         ClearScreen(scene.BackgroundColor);
 
         for (const auto& object_3D : scene.Objects)
         {            
-            Render(object_3D, primitive_type, first_primitive_offset, primitive_count);
+            Render(object_3D, viewing_transformations);
         }
 
 #if OLD_OPEN_GL
@@ -141,9 +140,6 @@ namespace GRAPHICS::OPEN_GL
     /// @param[in]  color - The color to clear to.
     void OpenGLRenderer::ClearScreen(const Color& color) const
     {
-        //glClearColor(color.Red, color.Green, color.Blue, color.Alpha);
-        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         GLfloat background_color[] = { color.Red, color.Green, color.Blue, color.Alpha };
         const GLint NO_SPECIFIC_DRAW_BUFFER = 0;
         glClearBufferfv(GL_COLOR, NO_SPECIFIC_DRAW_BUFFER, background_color);
@@ -151,20 +147,32 @@ namespace GRAPHICS::OPEN_GL
 
     /// Renders the specified object.
     /// @param[in]  object_3D - The 3D object to render.
-    void OpenGLRenderer::Render(const Object3D& object_3D, int primitive_type, unsigned int first_primitive_offset, unsigned int primitive_count) const
+    /// @param[in]  viewing_transformations - The viewing transformations.
+    void OpenGLRenderer::Render(const Object3D& object_3D, const ViewingTransformations& viewing_transformations) const
     {
-        /// @todo
-        primitive_type;
-        first_primitive_offset;
-        primitive_count;
+        // USE THE OBJECT'S SHADER PROGRAM.
+        glUseProgram(object_3D.ShaderProgram->Id);
+
+        // SET UNIFORMS.
+        GLint world_matrix_variable = glGetUniformLocation(object_3D.ShaderProgram->Id, "world_transform");
+        MATH::Matrix4x4f world_transform = object_3D.WorldTransform();
+        const float* world_matrix_elements_in_row_major_order = world_transform.ElementsInRowMajorOrder();
+        const GLsizei ONE_MATRIX = 1;
+        const GLboolean ROW_MAJOR_ORDER = GL_TRUE;
+        glUniformMatrix4fv(world_matrix_variable, ONE_MATRIX, ROW_MAJOR_ORDER, world_matrix_elements_in_row_major_order);
+
+        GLint view_matrix_variable = glGetUniformLocation(object_3D.ShaderProgram->Id, "view_transform");
+        const float* view_matrix_elements_in_row_major_order = viewing_transformations.CameraViewTransform.ElementsInRowMajorOrder();
+        glUniformMatrix4fv(view_matrix_variable, ONE_MATRIX, ROW_MAJOR_ORDER, view_matrix_elements_in_row_major_order);
+
+        GLint projection_matrix_variable = glGetUniformLocation(object_3D.ShaderProgram->Id, "projection_transform");
+        const float* projection_matrix_elements_in_row_major_order = viewing_transformations.CameraProjectionTransform.ElementsInRowMajorOrder();
+        glUniformMatrix4fv(projection_matrix_variable, ONE_MATRIX, ROW_MAJOR_ORDER, projection_matrix_elements_in_row_major_order);
 
         /// @todo   Pass vertices for entire object at once!
         /// @todo   Look at https://github.com/jpike/OpenGLEngine/ for possible better handling of some stuff?
         for (const auto& triangle : object_3D.Triangles)
         {
-            // USE THE TRIANGLE'S SHADER PROGRAM.
-            glUseProgram(object_3D.ShaderProgram->Id);
-
             // ALLOCATE A VERTEX ARRAY/BUFFER.
             const GLsizei ONE_VERTEX_ARRAY = 1;
             GLuint vertex_array_id = 0;

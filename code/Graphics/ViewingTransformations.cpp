@@ -2,6 +2,17 @@
 
 namespace GRAPHICS
 {
+    /// Creates viewing transformations for the specified camera, without a screen transform.
+    /// @param[in]  camera - The camera used for viewing.
+    ViewingTransformations::ViewingTransformations(const Camera& camera)
+    {
+        // INITIALIZE PROPERTIES FROM THE CAMERA.
+        CameraViewTransform = camera.ViewTransform();
+        CameraProjectionTransform = camera.ProjectionTransform();
+        CameraNearClipPlaneViewDistance = camera.NearClipPlaneViewDistance;
+        CameraFarClipPlaneViewDistance = camera.FarClipPlaneViewDistance;
+    }
+
     /// Creates viewing transformations for the specified parameters.
     /// @param[in]  camera - The camera used for viewing.
     /// @param[in]  output_plane - The 2D plane onto which the final image will be viewed.
