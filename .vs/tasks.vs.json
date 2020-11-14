@@ -1,5 +1,5 @@
 {
-    "version": "0.2.1",
+  "version": "0.2.1",
     "tasks": 
     [
         {
@@ -42,5 +42,13 @@
             "contextType": "build",
             "command": "build_demo_opengl.bat"
         },
+        {
+            "taskName": "task-build-demo-directx",
+            "taskLabel": "task-build-demo-directx",
+            "appliesTo": "build_demo_directx.bat",
+            "type": "launch",
+            "contextType": "build",
+            "command": "build_demo_directx.bat"
+        }
     ]
 }
