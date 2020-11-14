@@ -33,13 +33,17 @@ cbuffer TransformationMatrices
     matrix WorldMatrix;
     matrix ViewMatrix;
     matrix ProjectionMatrix;
+    float4 LightPosition;
+    float4 InputLightColor;
     bool IsTextured;
+    bool IsLit;
 };
 
 struct VertexInput
 {
     float4 Position: POSITION;
     float4 Color: COLOR;
+    float4 Normal: NORMAL;
     float2 TextureCoordinates: TEXCOORD0;
 };
 
@@ -49,6 +53,7 @@ struct PixelInput
     float4 Color: COLOR;
     float2 TextureCoordinates: TEXCOORD0;
     bool IsTextured: BOOL;
+    float4 LightColor: COLOR1;
 };
 
 PixelInput VertexShaderEntryPoint(VertexInput vertex_input)
@@ -70,9 +75,26 @@ PixelInput VertexShaderEntryPoint(VertexInput vertex_input)
         -projected_position.z / projected_position.w, 
         1.0);
 
-    pixel_input.Color = vertex_input.Color;
     pixel_input.TextureCoordinates = vertex_input.TextureCoordinates;
     pixel_input.IsTextured = IsTextured;
+
+    pixel_input.Color = vertex_input.Color;
+
+    /// @todo   Figure out why this lighting doesn't work!
+    if (IsLit)
+    {
+        float3 direction_from_vertex_to_light = LightPosition.xyz - world_position.xyz;
+        float3 unit_direction_from_point_to_light = normalize(direction_from_vertex_to_light);
+        float illumination_proportion = dot(vertex_input.Normal.xyz, unit_direction_from_point_to_light);
+        float clamped_illumination = max(0, illumination_proportion);
+        float3 scaled_light_color = clamped_illumination * InputLightColor.rgb;
+        pixel_input.LightColor = float4(scaled_light_color.rgb, 1.0);
+    }
+    else
+    {
+        pixel_input.LightColor = float4(1.0, 1.0, 1.0, 1.0);
+    }
+    
 
     return pixel_input;
 }
@@ -88,6 +110,7 @@ struct PixelInput
     float4 Color: COLOR;
     float2 TextureCoordinates: TEXCOORD0;
     bool IsTextured: BOOL;
+    float4 LightColor: COLOR1;
 };
 
 float4 PixelShaderEntryPoint(PixelInput pixel_input): SV_TARGET
@@ -95,11 +118,13 @@ float4 PixelShaderEntryPoint(PixelInput pixel_input): SV_TARGET
     if (pixel_input.IsTextured)
     {
         float4 texture_color = texture_image.Sample(texture_sampler_state, pixel_input.TextureCoordinates);
-        return texture_color;
+        float4 lit_texture_color = texture_color * pixel_input.LightColor;
+        return float4(lit_texture_color.rgb, 1.0);
     }
     else
     {
-        return pixel_input.Color;
+        float4 lit_color = pixel_input.Color * pixel_input.LightColor;
+        return float4(lit_color.rgb, 1.0);
     }
 }
 )HLSL";
@@ -111,14 +136,18 @@ struct TransformationMatrixBuffer
     DirectX::XMMATRIX WorldMatrix;
     DirectX::XMMATRIX ViewMatrix;
     DirectX::XMMATRIX ProjectionMatrix;
-    /// @todo   Remove hack for texturing here.
+    /// @todo   Remove hack for texturing/light here.
+    DirectX::XMFLOAT4 LightPosition;
+    DirectX::XMFLOAT4 InputLightColor;
     bool IsTextured;
+    bool IsLit;
 };
 
 struct VertexInputBuffer
 {
     DirectX::XMFLOAT4 Position;
     DirectX::XMFLOAT4 Color;
+    DirectX::XMFLOAT4 Normal;
     DirectX::XMFLOAT2 TextureCoordinates;
 };
 
@@ -619,6 +648,16 @@ LRESULT CALLBACK MainWindowCallback(
                     ++g_current_light_index;
                     g_current_light_index = g_current_light_index % g_light_configurations.size();
                     g_scene.PointLights = g_light_configurations[g_current_light_index];
+                    if (g_scene.PointLights)
+                    {
+                        const GRAPHICS::Light& first_light = g_scene.PointLights->at(0);
+                        std::string light_color_string =
+                            "\nLight Color: " +
+                            std::to_string(first_light.Color.Red) + ", " +
+                            std::to_string(first_light.Color.Green) + ", " +
+                            std::to_string(first_light.Color.Blue);
+                        OutputDebugString(light_color_string.c_str());
+                    }
                     break;
                 };
                 default:
@@ -1090,6 +1129,16 @@ int CALLBACK WinMain(
         },
         D3D11_INPUT_ELEMENT_DESC
         {
+            .SemanticName = "NORMAL",
+            .SemanticIndex = 0,
+            .Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
+            .InputSlot = 0,
+            .AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT,
+            .InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA,
+            .InstanceDataStepRate = 0,
+        },
+        D3D11_INPUT_ELEMENT_DESC
+        {
             .SemanticName = "TEXCOORD",
             .SemanticIndex = 0,
             .Format = DXGI_FORMAT_R32G32_FLOAT,
@@ -1370,6 +1419,8 @@ int CALLBACK WinMain(
         DirectX::XMMATRIX projection_matrix = DirectX::XMMATRIX(projection_transform.Elements.ValuesInColumnMajorOrder().data());
 #endif
 
+        bool is_lit = g_scene.PointLights.has_value();
+
         for (const auto& object_3D : g_scene.Objects)
         {
             for (const auto& triangle : object_3D.Triangles)
@@ -1389,6 +1440,22 @@ int CALLBACK WinMain(
 
                 bool is_textured = !triangle.Material->VertexTextureCoordinates.empty();
                 matrix_buffer->IsTextured = is_textured;
+
+                matrix_buffer->IsLit = is_lit;
+                if (is_lit)
+                {
+                    const GRAPHICS::Light& first_light = g_scene.PointLights->at(0);
+                    matrix_buffer->LightPosition = DirectX::XMFLOAT4(
+                        first_light.PointLightWorldPosition.X,
+                        first_light.PointLightWorldPosition.Y,
+                        first_light.PointLightWorldPosition.Z,
+                        1.0f);
+                    matrix_buffer->InputLightColor = DirectX::XMFLOAT4(
+                        first_light.Color.Red,
+                        first_light.Color.Green,
+                        first_light.Color.Blue,
+                        first_light.Color.Alpha);
+                }
 
     #if TRANSPOSE
                 matrix_buffer->WorldMatrix = XMMatrixTranspose(world_matrix);
@@ -1468,6 +1535,15 @@ int CALLBACK WinMain(
                     texture_coordinates.emplace_back(MATH::Vector2f());
                 }
 
+                GRAPHICS::Triangle world_space_triangle = triangle;
+                for (auto& vertex : world_space_triangle.Vertices)
+                {
+                    MATH::Vector4f homogeneous_vertex = MATH::Vector4f::HomogeneousPositionVector(vertex);
+                    MATH::Vector4f world_homogeneous_vertex = world_transform * homogeneous_vertex;
+                    vertex = MATH::Vector3f(world_homogeneous_vertex.X, world_homogeneous_vertex.Y, world_homogeneous_vertex.Z);
+                }
+
+                MATH::Vector3f surface_normal = world_space_triangle.SurfaceNormal();
                 VertexInputBuffer vertices[] =
                 {
                     VertexInputBuffer
@@ -1478,9 +1554,10 @@ int CALLBACK WinMain(
                             triangle.Material->VertexColors[0].Green,
                             triangle.Material->VertexColors[0].Blue,
                             triangle.Material->VertexColors[0].Alpha),
+                        .Normal = DirectX::XMFLOAT4(surface_normal.X, surface_normal.Y, surface_normal.Z, 1.0f),
                         .TextureCoordinates = DirectX::XMFLOAT2(
                             texture_coordinates[0].X,
-                            texture_coordinates[0].Y)
+                            texture_coordinates[0].Y),
                     },
                     VertexInputBuffer
                     {
@@ -1490,9 +1567,10 @@ int CALLBACK WinMain(
                             triangle.Material->VertexColors[1].Green,
                             triangle.Material->VertexColors[1].Blue,
                             triangle.Material->VertexColors[1].Alpha),
+                        .Normal = DirectX::XMFLOAT4(surface_normal.X, surface_normal.Y, surface_normal.Z, 1.0f),
                         .TextureCoordinates = DirectX::XMFLOAT2(
                             texture_coordinates[1].X,
-                            texture_coordinates[1].Y)
+                            texture_coordinates[1].Y),
                     },
                     VertexInputBuffer
                     {
@@ -1502,9 +1580,10 @@ int CALLBACK WinMain(
                             triangle.Material->VertexColors[2].Green,
                             triangle.Material->VertexColors[2].Blue,
                             triangle.Material->VertexColors[2].Alpha),
+                        .Normal = DirectX::XMFLOAT4(surface_normal.X, surface_normal.Y, surface_normal.Z, 1.0f),
                         .TextureCoordinates = DirectX::XMFLOAT2(
                             texture_coordinates[2].X,
-                            texture_coordinates[2].Y)
+                            texture_coordinates[2].Y),
                     },
                 };
                 D3D11_SUBRESOURCE_DATA vertex_data
