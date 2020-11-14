@@ -35,10 +35,12 @@ uniform mat4 projection_transform;
 
 in vec4 local_vertex;
 in vec4 input_vertex_color;
+in vec2 input_texture_coordinates;
 
 out VERTEX_SHADER_OUTPUT
 {
     vec4 color;
+    vec2 texture_coordinates;
 } vertex_shader_output;
 
 void main()
@@ -56,22 +58,34 @@ void main()
         -projected_vertex.z / projected_vertex.w, 
         1.0);
     vertex_shader_output.color = input_vertex_color;
+    vertex_shader_output.texture_coordinates = input_texture_coordinates;
 }
 )GLSL";
 
 static const char* SINGLE_COLOR_FRAGMENT_SHADER = R"GLSL(
 #version 420 core
 
+uniform bool is_textured;
+uniform sampler2D texture_sampler;
+
 in VERTEX_SHADER_OUTPUT
 {
     vec4 color;
+    vec2 texture_coordinates;
 } fragment_shader_input;
 
 out vec4 fragment_color;
 
 void main()
 {
-    fragment_color = fragment_shader_input.color;
+    if (is_textured)
+    {
+        fragment_color = texture(texture_sampler, fragment_shader_input.texture_coordinates);
+    }
+    else
+    {
+        fragment_color = fragment_shader_input.color;
+    }
 }
 )GLSL";
 
