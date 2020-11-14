@@ -33,14 +33,20 @@ uniform mat4 world_transform;
 uniform mat4 view_transform;
 uniform mat4 projection_transform;
 
+uniform bool is_lit;
+uniform vec4 light_position;
+uniform vec4 input_light_color;
+
 in vec4 local_vertex;
 in vec4 input_vertex_color;
 in vec2 input_texture_coordinates;
+in vec4 vertex_normal;
 
 out VERTEX_SHADER_OUTPUT
 {
     vec4 color;
     vec2 texture_coordinates;
+    vec4 light_color;
 } vertex_shader_output;
 
 void main()
@@ -59,6 +65,20 @@ void main()
         1.0);
     vertex_shader_output.color = input_vertex_color;
     vertex_shader_output.texture_coordinates = input_texture_coordinates;
+
+    if (is_lit)
+    {
+        vec3 direction_from_vertex_to_light = light_position.xyz - world_vertex.xyz;
+        vec3 unit_direction_from_point_to_light = normalize(direction_from_vertex_to_light);
+        float illumination_proportion = dot(vertex_normal.xyz, unit_direction_from_point_to_light);
+        float clamped_illumination = max(0, illumination_proportion);
+        vec3 scaled_light_color = clamped_illumination * input_light_color.xyz;
+        vertex_shader_output.light_color = vec4(scaled_light_color.rgb, 1.0);
+    }
+    else
+    {
+        vertex_shader_output.light_color = vec4(1.0, 1.0, 1.0, 1.0);
+    }
 }
 )GLSL";
 
@@ -72,6 +92,7 @@ in VERTEX_SHADER_OUTPUT
 {
     vec4 color;
     vec2 texture_coordinates;
+    vec4 light_color;
 } fragment_shader_input;
 
 out vec4 fragment_color;
@@ -80,11 +101,14 @@ void main()
 {
     if (is_textured)
     {
-        fragment_color = texture(texture_sampler, fragment_shader_input.texture_coordinates);
+        vec4 texture_color = texture(texture_sampler, fragment_shader_input.texture_coordinates);
+        vec4 lit_texture_color = texture_color * fragment_shader_input.light_color;
+        fragment_color = vec4(lit_texture_color.xyz, 1.0);
     }
     else
     {
-        fragment_color = fragment_shader_input.color;
+        vec4 lit_color = fragment_shader_input.color * fragment_shader_input.light_color;
+        fragment_color = vec4(lit_color.xyz, 1.0);
     }
 }
 )GLSL";
