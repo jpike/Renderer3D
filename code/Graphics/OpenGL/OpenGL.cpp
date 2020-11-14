@@ -1,3 +1,5 @@
+#include <sstream>
+#include <string>
 #include "Graphics/OpenGL/OpenGL.h"
 
 namespace GRAPHICS
@@ -7,6 +9,29 @@ namespace OPEN_GL
     PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB = nullptr;
     PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = nullptr;
    
+    void OpenGLDebugMessageCallback(
+        GLenum source,
+        GLenum type,
+        GLuint id,
+        GLenum severity,
+        GLsizei length,
+        const GLchar* message,
+        void* user_parameter)
+    {
+        std::stringstream debug_message;
+        debug_message
+            << "\nOpenGL debug:"
+            << "\tsource = " << source
+            << "\ttype = " << type
+            << "\tid = " << id
+            << "\tseverity = " << severity
+            << "\tlength = " << length
+            << "\tmessage = " << message
+            << "\tuser_parameter = " << user_parameter
+            << "\n";
+        OutputDebugString(debug_message.str().c_str());
+    }
+
     /// Attempts to load all necessary OpenGL functions.
     /// @return True if loading succeeds; false otherwise.
     bool LoadOpenGLFunctions()
@@ -75,6 +100,15 @@ namespace OPEN_GL
         {
             return nullptr;
         }
+
+        glDebugMessageCallback(OpenGLDebugMessageCallback, NULL);
+        glDebugMessageControl(
+            GL_DONT_CARE,
+            GL_DONT_CARE,
+            GL_DONT_CARE,
+            0,
+            NULL,
+            GL_TRUE);
 
         // SET THE PIXEL FORMAT.
         const int pixel_format_attribute_list[] =

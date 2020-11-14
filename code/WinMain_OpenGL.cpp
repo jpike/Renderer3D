@@ -43,8 +43,18 @@ out VERTEX_SHADER_OUTPUT
 
 void main()
 {
-    //gl_Position =  projection_transform * view_transform * world_transform * local_vertex;
-    gl_Position = world_transform * local_vertex;
+    vec4 world_vertex = world_transform * local_vertex;
+    vec4 view_position = view_transform * world_vertex;
+    vec4 projected_vertex = projection_transform * view_position;
+    // See https://stackoverflow.com/questions/47233771/negative-values-for-gl-position-w
+    // Not entirely sure why I had to do this manually.
+    // Might have something to do with my particular projection matrices.
+    gl_Position = vec4(
+        projected_vertex.x / projected_vertex.w,
+        projected_vertex.y / projected_vertex.w, 
+        // My particular projection matrices differ a bit from OpenGL conventions.
+        -projected_vertex.z / projected_vertex.w, 
+        1.0);
     vertex_shader_output.color = input_vertex_color;
 }
 )GLSL";

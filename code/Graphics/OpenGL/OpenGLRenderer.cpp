@@ -11,7 +11,7 @@ namespace GRAPHICS::OPEN_GL
     /// @param[in]  camera - The camera to use to view the scene.
     void OpenGLRenderer::Render(const Scene& scene, const Camera& camera) const
     {
-        //glEnable(GL_DEPTH_TEST);
+        glEnable(GL_DEPTH_TEST);
 
         ViewingTransformations viewing_transformations(camera);
 
@@ -143,6 +143,10 @@ namespace GRAPHICS::OPEN_GL
         GLfloat background_color[] = { color.Red, color.Green, color.Blue, color.Alpha };
         const GLint NO_SPECIFIC_DRAW_BUFFER = 0;
         glClearBufferfv(GL_COLOR, NO_SPECIFIC_DRAW_BUFFER, background_color);
+
+        /// @todo   Not sure if this is fully correct.
+        GLfloat max_depth[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        glClearBufferfv(GL_DEPTH, NO_SPECIFIC_DRAW_BUFFER, max_depth);
     }
 
     /// Renders the specified object.
