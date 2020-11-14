@@ -33,18 +33,22 @@ cbuffer TransformationMatrices
     matrix WorldMatrix;
     matrix ViewMatrix;
     matrix ProjectionMatrix;
+    bool IsTextured;
 };
 
 struct VertexInput
 {
     float4 Position: POSITION;
     float4 Color: COLOR;
+    float2 TextureCoordinates: TEXCOORD0;
 };
 
 struct PixelInput
 {
     float4 Position: SV_POSITION;
     float4 Color: COLOR;
+    float2 TextureCoordinates: TEXCOORD0;
+    bool IsTextured: BOOL;
 };
 
 PixelInput VertexShaderEntryPoint(VertexInput vertex_input)
@@ -67,21 +71,36 @@ PixelInput VertexShaderEntryPoint(VertexInput vertex_input)
         1.0);
 
     pixel_input.Color = vertex_input.Color;
+    pixel_input.TextureCoordinates = vertex_input.TextureCoordinates;
+    pixel_input.IsTextured = IsTextured;
 
     return pixel_input;
 }
 )HLSL";
 
 static std::string PIXEL_SHADER = R"HLSL( 
+Texture2D texture_image;
+SamplerState texture_sampler_state;
+
 struct PixelInput
 {
     float4 Position: SV_POSITION;
     float4 Color: COLOR;
+    float2 TextureCoordinates: TEXCOORD0;
+    bool IsTextured: BOOL;
 };
 
 float4 PixelShaderEntryPoint(PixelInput pixel_input): SV_TARGET
 {
-    return pixel_input.Color;
+    if (pixel_input.IsTextured)
+    {
+        float4 texture_color = texture_image.Sample(texture_sampler_state, pixel_input.TextureCoordinates);
+        return texture_color;
+    }
+    else
+    {
+        return pixel_input.Color;
+    }
 }
 )HLSL";
 
@@ -92,12 +111,15 @@ struct TransformationMatrixBuffer
     DirectX::XMMATRIX WorldMatrix;
     DirectX::XMMATRIX ViewMatrix;
     DirectX::XMMATRIX ProjectionMatrix;
+    /// @todo   Remove hack for texturing here.
+    bool IsTextured;
 };
 
 struct VertexInputBuffer
 {
     DirectX::XMFLOAT4 Position;
     DirectX::XMFLOAT4 Color;
+    DirectX::XMFLOAT2 TextureCoordinates;
 };
 
 // GLOBALS.
@@ -1065,7 +1087,17 @@ int CALLBACK WinMain(
             .AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT,
             .InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA,
             .InstanceDataStepRate = 0,
-        }
+        },
+        D3D11_INPUT_ELEMENT_DESC
+        {
+            .SemanticName = "TEXCOORD",
+            .SemanticIndex = 0,
+            .Format = DXGI_FORMAT_R32G32_FLOAT,
+            .InputSlot = 0,
+            .AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT,
+            .InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA,
+            .InstanceDataStepRate = 0,
+        },
     };
     ID3D11InputLayout* vertex_input_layout = nullptr;
     result = device->CreateInputLayout(
@@ -1077,6 +1109,23 @@ int CALLBACK WinMain(
     PrintResultIfFailed(result);
     pixel_shader_compiled_code->Release();
     vertex_shader_compiled_code->Release();
+
+    D3D11_SAMPLER_DESC sampler_description =
+    {
+        .Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR,
+        .AddressU = D3D11_TEXTURE_ADDRESS_WRAP,
+        .AddressV = D3D11_TEXTURE_ADDRESS_WRAP,
+        .AddressW = D3D11_TEXTURE_ADDRESS_WRAP,
+        .MipLODBias = 0.0f,
+        .MaxAnisotropy = 1,
+        .ComparisonFunc = D3D11_COMPARISON_ALWAYS,
+        .BorderColor = {},
+        .MinLOD = 0,
+        .MaxLOD = D3D11_FLOAT32_MAX
+    };
+    ID3D11SamplerState* sampler_state = nullptr;
+    result = device->CreateSamplerState(&sampler_description, &sampler_state);
+    PrintResultIfFailed(result);
 
     D3D11_BUFFER_DESC transformation_matrix_buffer_description =
     {
@@ -1323,37 +1372,40 @@ int CALLBACK WinMain(
 
         for (const auto& object_3D : g_scene.Objects)
         {
-#if TRANSPOSE
-            MATH::Matrix4x4f world_transform = object_3D.WorldTransform();
-            DirectX::XMMATRIX world_matrix = DirectX::XMMATRIX(world_transform.ElementsInRowMajorOrder());
-#else
-            MATH::Matrix4x4f world_transform = object_3D.WorldTransform();
-            DirectX::XMMATRIX world_matrix = DirectX::XMMATRIX(world_transform.Elements.ValuesInColumnMajorOrder().data());
-#endif
-
-            D3D11_MAPPED_SUBRESOURCE mapped_matrix_buffer;
-            result = device_context->Map(transformation_matrix_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_matrix_buffer);
-            PrintResultIfFailed(result);
-            TransformationMatrixBuffer* matrix_buffer = (TransformationMatrixBuffer*)mapped_matrix_buffer.pData;
-
-#if TRANSPOSE
-            matrix_buffer->WorldMatrix = XMMatrixTranspose(world_matrix);
-            matrix_buffer->ViewMatrix = XMMatrixTranspose(view_matrix);
-            matrix_buffer->ProjectionMatrix = XMMatrixTranspose(projection_matrix);
-#else
-            matrix_buffer->WorldMatrix = world_matrix;
-            matrix_buffer->ViewMatrix = view_matrix;
-            matrix_buffer->ProjectionMatrix = projection_matrix;
-#endif
-            device_context->Unmap(transformation_matrix_buffer, 0);
-            device_context->VSSetConstantBuffers(0, 1, &transformation_matrix_buffer);
-
-            device_context->IASetInputLayout(vertex_input_layout);
-            device_context->VSSetShader(vertex_shader, NULL, 0);
-            device_context->PSSetShader(pixel_shader, NULL, 0);
-
             for (const auto& triangle : object_3D.Triangles)
             {
+    #if TRANSPOSE
+                MATH::Matrix4x4f world_transform = object_3D.WorldTransform();
+                DirectX::XMMATRIX world_matrix = DirectX::XMMATRIX(world_transform.ElementsInRowMajorOrder());
+    #else
+                MATH::Matrix4x4f world_transform = object_3D.WorldTransform();
+                DirectX::XMMATRIX world_matrix = DirectX::XMMATRIX(world_transform.Elements.ValuesInColumnMajorOrder().data());
+    #endif
+
+                D3D11_MAPPED_SUBRESOURCE mapped_matrix_buffer;
+                result = device_context->Map(transformation_matrix_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_matrix_buffer);
+                PrintResultIfFailed(result);
+                TransformationMatrixBuffer* matrix_buffer = (TransformationMatrixBuffer*)mapped_matrix_buffer.pData;
+
+                bool is_textured = !triangle.Material->VertexTextureCoordinates.empty();
+                matrix_buffer->IsTextured = is_textured;
+
+    #if TRANSPOSE
+                matrix_buffer->WorldMatrix = XMMatrixTranspose(world_matrix);
+                matrix_buffer->ViewMatrix = XMMatrixTranspose(view_matrix);
+                matrix_buffer->ProjectionMatrix = XMMatrixTranspose(projection_matrix);
+    #else
+                matrix_buffer->WorldMatrix = world_matrix;
+                matrix_buffer->ViewMatrix = view_matrix;
+                matrix_buffer->ProjectionMatrix = projection_matrix;
+    #endif
+                device_context->Unmap(transformation_matrix_buffer, 0);
+                device_context->VSSetConstantBuffers(0, 1, &transformation_matrix_buffer);
+
+                device_context->IASetInputLayout(vertex_input_layout);
+                device_context->VSSetShader(vertex_shader, NULL, 0);
+                device_context->PSSetShader(pixel_shader, NULL, 0);
+
                 D3D11_BUFFER_DESC vertex_buffer_description
                 {
                     .ByteWidth = sizeof(VertexInputBuffer) * GRAPHICS::Triangle::VERTEX_COUNT,
@@ -1363,6 +1415,59 @@ int CALLBACK WinMain(
                     .MiscFlags = 0,
                     .StructureByteStride = 0,
                 };
+
+                ID3D11Texture2D* object_texture = nullptr;
+                ID3D11ShaderResourceView* texture_view = nullptr;
+                std::vector<MATH::Vector2f> texture_coordinates;
+                if (is_textured)
+                {
+                    texture_coordinates = triangle.Material->VertexTextureCoordinates;
+
+                    D3D11_TEXTURE2D_DESC texture_description =
+                    {
+                        .Width = triangle.Material->Texture->GetWidthInPixels(),
+                        .Height = triangle.Material->Texture->GetHeightInPixels(),
+                        .MipLevels = 0,
+                        .ArraySize = 1,
+                        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+                        .SampleDesc = {.Count = 1, .Quality = 0 },
+                        .Usage = D3D11_USAGE_DEFAULT,
+                        .BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET,
+                        .CPUAccessFlags = 0,
+                        .MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS
+                    };
+                    result = device->CreateTexture2D(&texture_description, NULL, &object_texture);
+                    PrintResultIfFailed(result);
+                    UINT texture_row_pitch = (4 * texture_description.Width) * sizeof(uint8_t);
+                    device_context->UpdateSubresource(
+                        object_texture,
+                        0,
+                        NULL,
+                        triangle.Material->Texture->GetRawData(),
+                        texture_row_pitch,
+                        0);
+
+                    D3D11_SHADER_RESOURCE_VIEW_DESC texture_shader_resource_description =
+                    {
+                        .Format = texture_description.Format,
+                        .ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D,
+                        .Texture2D = 
+                        {
+                            .MostDetailedMip = 0,
+                            .MipLevels = 1
+                        }
+                    };
+                    result = device->CreateShaderResourceView(object_texture, &texture_shader_resource_description, &texture_view);
+                    PrintResultIfFailed(result);
+                    device_context->GenerateMips(texture_view);
+                }
+                else
+                {
+                    texture_coordinates.emplace_back(MATH::Vector2f());
+                    texture_coordinates.emplace_back(MATH::Vector2f());
+                    texture_coordinates.emplace_back(MATH::Vector2f());
+                }
+
                 VertexInputBuffer vertices[] =
                 {
                     VertexInputBuffer
@@ -1372,7 +1477,10 @@ int CALLBACK WinMain(
                             triangle.Material->VertexColors[0].Red,
                             triangle.Material->VertexColors[0].Green,
                             triangle.Material->VertexColors[0].Blue,
-                            triangle.Material->VertexColors[0].Alpha)
+                            triangle.Material->VertexColors[0].Alpha),
+                        .TextureCoordinates = DirectX::XMFLOAT2(
+                            texture_coordinates[0].X,
+                            texture_coordinates[0].Y)
                     },
                     VertexInputBuffer
                     {
@@ -1381,7 +1489,10 @@ int CALLBACK WinMain(
                             triangle.Material->VertexColors[1].Red,
                             triangle.Material->VertexColors[1].Green,
                             triangle.Material->VertexColors[1].Blue,
-                            triangle.Material->VertexColors[1].Alpha)
+                            triangle.Material->VertexColors[1].Alpha),
+                        .TextureCoordinates = DirectX::XMFLOAT2(
+                            texture_coordinates[1].X,
+                            texture_coordinates[1].Y)
                     },
                     VertexInputBuffer
                     {
@@ -1390,7 +1501,10 @@ int CALLBACK WinMain(
                             triangle.Material->VertexColors[2].Red,
                             triangle.Material->VertexColors[2].Green,
                             triangle.Material->VertexColors[2].Blue,
-                            triangle.Material->VertexColors[2].Alpha)
+                            triangle.Material->VertexColors[2].Alpha),
+                        .TextureCoordinates = DirectX::XMFLOAT2(
+                            texture_coordinates[2].X,
+                            texture_coordinates[2].Y)
                     },
                 };
                 D3D11_SUBRESOURCE_DATA vertex_data
@@ -1408,11 +1522,23 @@ int CALLBACK WinMain(
                 device_context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
                 device_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+                if (is_textured)
+                {
+                    device_context->PSSetSamplers(0, 1, &sampler_state);
+                    device_context->PSSetShaderResources(0, 1, &texture_view);
+                }
+
                 UINT vertex_count = GRAPHICS::Triangle::VERTEX_COUNT;
                 constexpr UINT START_VERTEX_INDEX = 0;
                 device_context->Draw(vertex_count, START_VERTEX_INDEX);
 
                 vertex_buffer->Release();
+
+                if (is_textured)
+                {
+                    texture_view->Release();
+                    object_texture->Release();
+                }
             }
         }
 
@@ -1436,6 +1562,7 @@ int CALLBACK WinMain(
 #endif
     }
 
+    sampler_state->Release();
     transformation_matrix_buffer->Release();
     vertex_input_layout->Release();
     pixel_shader->Release();
