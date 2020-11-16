@@ -35,8 +35,7 @@ cbuffer TransformationMatrices
     matrix ProjectionMatrix;
     float4 LightPosition;
     float4 InputLightColor;
-    bool IsTextured;
-    bool IsLit;
+    int2 IsTexturedAndLit;
 };
 
 struct VertexInput
@@ -76,12 +75,11 @@ PixelInput VertexShaderEntryPoint(VertexInput vertex_input)
         1.0);
 
     pixel_input.TextureCoordinates = vertex_input.TextureCoordinates;
-    pixel_input.IsTextured = IsTextured;
+    pixel_input.IsTextured = (IsTexturedAndLit.x == 1);
 
     pixel_input.Color = vertex_input.Color;
 
-    /// @todo   Figure out why this lighting doesn't work!
-    if (IsLit)
+    if (IsTexturedAndLit.y == 1)
     {
         float3 direction_from_vertex_to_light = LightPosition.xyz - world_position.xyz;
         float3 unit_direction_from_point_to_light = normalize(direction_from_vertex_to_light);
@@ -139,8 +137,7 @@ struct TransformationMatrixBuffer
     /// @todo   Remove hack for texturing/light here.
     DirectX::XMFLOAT4 LightPosition;
     DirectX::XMFLOAT4 InputLightColor;
-    bool IsTextured;
-    bool IsLit;
+    DirectX::XMINT2 IsTexturedAndIsLit;
 };
 
 struct VertexInputBuffer
@@ -1053,7 +1050,7 @@ int CALLBACK WinMain(
         NULL,
         "VertexShaderEntryPoint",
         "vs_5_0",
-        D3DCOMPILE_ENABLE_STRICTNESS,
+        D3DCOMPILE_DEBUG | D3DCOMPILE_ENABLE_STRICTNESS,
         0,
         &vertex_shader_compiled_code,
         &vertex_shader_error_messages);
@@ -1076,7 +1073,7 @@ int CALLBACK WinMain(
         NULL,
         "PixelShaderEntryPoint",
         "ps_5_0",
-        D3DCOMPILE_ENABLE_STRICTNESS,
+        D3DCOMPILE_DEBUG | D3DCOMPILE_ENABLE_STRICTNESS,
         0,
         &pixel_shader_compiled_code,
         &pixel_shader_error_messages);
@@ -1439,9 +1436,9 @@ int CALLBACK WinMain(
                 TransformationMatrixBuffer* matrix_buffer = (TransformationMatrixBuffer*)mapped_matrix_buffer.pData;
 
                 bool is_textured = !triangle.Material->VertexTextureCoordinates.empty();
-                matrix_buffer->IsTextured = is_textured;
+                matrix_buffer->IsTexturedAndIsLit.x = is_textured;
 
-                matrix_buffer->IsLit = is_lit;
+                matrix_buffer->IsTexturedAndIsLit.y = is_lit;
                 if (is_lit)
                 {
                     const GRAPHICS::Light& first_light = g_scene.PointLights->at(0);
